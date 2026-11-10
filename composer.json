@@ -51,6 +51,12 @@
         }
     },
     "scripts": {
+        "post-install-cmd": [
+            "yidas\\yii2BowerAsset\\Installer::bower"
+        ],
+        "post-update-cmd": [
+            "yidas\\yii2BowerAsset\\Installer::bower"
+        ],
         "post-create-project-cmd": [
             "yii\\composer\\Installer::postCreateProject"
         ]
