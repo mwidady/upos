@@ -43,8 +43,8 @@ class FaqSearch extends Faq
     {
        $branchId= User::findOne(Yii::$app->user->id)->branch_id;
 
-        $query = Faq::find()->where(['branch_id'=>$branchId])
-        ->orderBy('id DESC');
+        $query = Faq::find()->orderBy('id DESC');
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
 
         // add conditions that should always apply here
 

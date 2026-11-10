@@ -21,7 +21,8 @@ class ExpenseTypeSearch extends ExpenseType
     public function search($params)
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $query = ExpenseType::find()->where(['branch_id' => $branchId])->orderBy(['name' => SORT_ASC]);
+        $query = ExpenseType::find()->orderBy(['name' => SORT_ASC]);
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
         $provider = new ActiveDataProvider(['query' => $query]);
         $this->load($params);
         if ($this->validate()) {

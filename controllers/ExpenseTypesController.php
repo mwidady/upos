@@ -80,7 +80,9 @@ class ExpenseTypesController extends Controller
     protected function findModel($id)
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $model = ExpenseType::findOne(['id' => $id, 'branch_id' => $branchId]);
+        $query = ExpenseType::find()->where(['id' => $id]);
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
+        $model = $query->one();
         if ($model !== null) {
             return $model;
         }

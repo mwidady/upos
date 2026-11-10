@@ -42,9 +42,8 @@ class CustomersSearch extends Customers
     public function search($params)
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $query = Customers::find()
-        ->where(['branch_id'=>$branchId])
-        ->orderBy('id DESC');
+        $query = Customers::find()->orderBy('id DESC');
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
 
         // add conditions that should always apply here
 

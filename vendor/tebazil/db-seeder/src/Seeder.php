@@ -67,7 +67,7 @@ class Seeder
         foreach($dependencyMap as $tableName=>$tableDependencies) {
             foreach($tableDependencies as $dependencyTableName) {
                 if(in_array($tableName, $dependencyMap[$dependencyTableName])) {
-                    throw new \InvalidArgumentException("You cannot pass tables that are dependent on each other");
+                    throw new \InvalidArgumentException("You cannot pass tables that are git  on each other");
                 }
             }
         }

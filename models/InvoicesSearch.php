@@ -47,8 +47,8 @@ class InvoicesSearch extends Invoices
         $user = User::findOne(Yii::$app->user->id);
         $query = Invoices::find()
         ->joinWith(['customer', 'generatedBy'])
-        ->where(['invoices.branch_id'=> $user->branch_id])
         ->orderBy('id DESC');
+        \app\components\BranchAccess::apply($query, 'invoices.branch_id', $user->branch_id);
 
         // add conditions that should always apply here
 

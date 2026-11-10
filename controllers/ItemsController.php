@@ -14,6 +14,7 @@ use app\models\Workflow;
 
 use yii\web\Controller;
 use app\models\Invoices;
+use app\models\Branch;
 use app\models\Customers;
 
 use app\models\WorkflowConstant;
@@ -28,6 +29,7 @@ use yii\filters\AccessControl;
 use yii\data\ActiveDataProvider;
 use yii\web\NotFoundHttpException;
 use app\models\PaymentTransactions;
+use app\components\BranchAccess;
 
 use yii\web\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -520,7 +522,7 @@ class ItemsController extends Controller
 
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
 
-        $receipt_details = (new \yii\db\Query())
+        $receiptDetailsQuery = (new \yii\db\Query())
             ->select([
                 'DISTINCT(T.ts_time) AS pdatetime', 'T.id', 'U.first_name', 'U.last_name',
                 'C.clogo', 'I.status', 'C.fname', 'C.lname', 'C.phone', 'C.company',
@@ -580,15 +582,16 @@ class ItemsController extends Controller
             ->from('transactions T')
             ->innerJoin('customers C', 'T.customer_id = C.id')
             ->innerJoin('user U', 'T.user_id = U.id')
+            ->innerJoin('invoices I', 'T.invoice_id = I.id')
             ->where([
                 'T.status' => 'invoice',
-                'T.ts_time' => $ts_time,
-                'I.branch_id' => $branchId
+                'T.ts_time' => $ts_time
             ])
-            ->orderBy('T.id DESC')
-            ->one();
+            ->orderBy('T.id DESC');
+        BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+        $receipt_details = $receiptDetailsQuery->one();
 
-        $receipt_items = (new \yii\db\Query())
+        $receiptItemsQuery = (new \yii\db\Query())
             ->select([
                 'T.id', 'I.name', 'T.price',
                 'T.quantity', 'I.supplier', 'I.vat',
@@ -599,11 +602,11 @@ class ItemsController extends Controller
             ->where(
                 [
                     'T.ts_time' => $ts_time,
-                    'T.status' => 'invoice',
-                    'I.branch_id' => $branchId
+                    'T.status' => 'invoice'
                 ]
-            )
-            ->all();
+            );
+        BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+        $receipt_items = $receiptItemsQuery->all();
 
         return $this->render('receipt', [
             'receipt_items' => $receipt_items,
@@ -615,7 +618,7 @@ class ItemsController extends Controller
         $ts_time = $rec_time;
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
 
-        $receipt_details = (new \yii\db\Query())
+        $receiptDetailsQuery = (new \yii\db\Query())
             ->select([
                 'DISTINCT(T.ts_time) AS pdatetime', 'T.id', 'U.first_name', 'U.last_name',
                 'C.clogo', 'I.status', 'C.fname', 'C.lname', 'C.phone', 'C.company',
@@ -627,15 +630,15 @@ class ItemsController extends Controller
             ->innerJoin('invoices I', 'T.invoice_id = I.id')
             ->where([
                 'I.status' => 'PAID',
-                'T.ts_time' => $ts_time,
-                'I.branch_id' => $branchId
+                'T.ts_time' => $ts_time
             ])
             ->groupBy('T.ts_time')
-            ->orderBy('T.id DESC')
-            ->one();
+            ->orderBy('T.id DESC');
+        BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+        $receipt_details = $receiptDetailsQuery->one();
 
 
-        $receipt_items = (new \yii\db\Query())
+        $receiptItemsQuery = (new \yii\db\Query())
             ->select([
                 'T.id', 'I.name', 'T.price',
                 'T.quantity', 'I.supplier', 'I.vat',
@@ -645,11 +648,11 @@ class ItemsController extends Controller
             ->innerJoin('transactions T', 'T.item_id = I.id')
             ->where(
                 [
-                    'T.ts_time' => $ts_time,
-                    'I.branch_id' => $branchId
+                    'T.ts_time' => $ts_time
                 ]
-            )
-            ->all();
+            );
+        BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+        $receipt_items = $receiptItemsQuery->all();
 
         $query = (new \yii\db\Query())
             ->from('transactions')
@@ -671,9 +674,9 @@ class ItemsController extends Controller
 
         $invoice = Invoices::findOne($id);
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-         $payPartial = Workflow::find()
-        ->where(['branch_id' => $branchId,'workflow_code' => WorkflowConstant::PARTIAL_PAYMENT])
-        ->count();  
+        $workflowQuery = Workflow::find()->where(['workflow_code' => WorkflowConstant::PARTIAL_PAYMENT]);
+        BranchAccess::apply($workflowQuery, 'branch_id', $branchId);
+        $payPartial = $workflowQuery->count();
         
 
         $model = new PaymentTransactions();
@@ -739,7 +742,7 @@ class ItemsController extends Controller
             )
                 ->execute();
 
-            $receipt_details = (new \yii\db\Query())
+            $receiptDetailsQuery = (new \yii\db\Query())
                 ->select([
                     'T.ts_time',
                     'T.ts_time AS pdatetime',
@@ -753,20 +756,20 @@ class ItemsController extends Controller
                 ->innerJoin('invoices I', 'T.invoice_id = I.id')
                 ->where([
                     'T.status' => 'invoice',
-                    'T.invoice_id' => $id,
-                    'I.branch_id' => $branchId
+                    'T.invoice_id' => $id
                 ])
                 ->groupBy(['T.id','T.ts_time','U.first_name', 'U.last_name', 'C.clogo','I.status', 'C.fname', 'C.lname', 'C.phone','C.company', 'C.address', 'I.invoiceno', 'I.id'])
-                ->orderBy('T.id DESC')
-                ->one();
+                ->orderBy('T.id DESC');
+            BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+            $receipt_details = $receiptDetailsQuery->one();
 
-            $station = User::findOne(Yii::$app->user->id)->branch;
+            $station = $invoice ? Branch::findOne($invoice->branch_id) : User::findOne(Yii::$app->user->id)->branch;
 
             $query = (new \yii\db\Query())->from('transactions')->where(['invoice_id' => $id]);
             $modelsumt = $query->sum('price * quantity');
 
 
-            $receipt_items = (new \yii\db\Query())
+            $receiptItemsQuery = (new \yii\db\Query())
                 ->select([
                     'T.id', 'I.name', 'T.price',
                     'T.quantity', 'I.supplier', 'I.vat',
@@ -776,11 +779,11 @@ class ItemsController extends Controller
                 ->innerJoin('transactions T', 'T.item_id = I.id')
                 ->where(
                     [
-                        'T.invoice_id' => $id,
-                        'I.branch_id' => $branchId
+                        'T.invoice_id' => $id
                     ]
-                )
-                ->all();
+                );
+            BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+            $receipt_items = $receiptItemsQuery->all();
 
             return $this->render('receipt_final', [
                 'receipt_items' => $receipt_items,
@@ -823,7 +826,7 @@ class ItemsController extends Controller
 
             $connection->createCommand("UPDATE invoices SET status = 'PAID' WHERE id = '" . $id . "'")->execute();
 
-            $receipt_details = (new \yii\db\Query())
+            $receiptDetailsQuery = (new \yii\db\Query())
                 ->select([
                     'T.ts_time',
                     'T.ts_time AS pdatetime',
@@ -837,20 +840,20 @@ class ItemsController extends Controller
                 ->innerJoin('invoices I', 'T.invoice_id = I.id')
                 ->where([
                     'T.status' => 'invoice',
-                    'T.invoice_id' => $id,
-                    'I.branch_id' => $branchId
+                    'T.invoice_id' => $id
                 ])
                 ->groupBy(['T.id','T.ts_time','U.first_name', 'U.last_name', 'C.clogo','I.status', 'C.fname', 'C.lname', 'C.phone','C.company', 'C.address', 'I.invoiceno', 'I.id'])
-                ->orderBy('T.id DESC')
-                ->one();
+                ->orderBy('T.id DESC');
+            BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+            $receipt_details = $receiptDetailsQuery->one();
 
-            $station = User::findOne(Yii::$app->user->id)->branch;
+            $station = $invoice ? Branch::findOne($invoice->branch_id) : User::findOne(Yii::$app->user->id)->branch;
 
             $query = (new \yii\db\Query())->from('transactions')->where(['invoice_id' => $id]);
             $modelsumt = $query->sum('price * quantity');
 
 
-            $receipt_items = (new \yii\db\Query())
+            $receiptItemsQuery = (new \yii\db\Query())
                 ->select([
                     'T.id', 'I.name', 'T.price',
                     'T.quantity', 'I.supplier', 'I.vat',
@@ -860,11 +863,11 @@ class ItemsController extends Controller
                 ->innerJoin('transactions T', 'T.item_id = I.id')
                 ->where(
                     [
-                        'T.invoice_id' => $id,
-                        'I.branch_id' => $branchId
+                        'T.invoice_id' => $id
                     ]
-                )
-                ->all();
+                );
+            BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+            $receipt_items = $receiptItemsQuery->all();
 
             return $this->render('receipt_final', [
                 'receipt_items' => $receipt_items,
@@ -889,7 +892,7 @@ class ItemsController extends Controller
             WHERE id = '" . $id . "'"
         )->execute();
 
-        $receipt_details = (new \yii\db\Query())
+        $receiptDetailsQuery = (new \yii\db\Query())
         ->select([
             'DISTINCT(T.ts_time) AS pdatetime', 'T.id', 'U.first_name', 'U.last_name',
             'C.clogo', 'I.status', 'C.fname', 'C.lname', 'C.phone', 'C.company',
@@ -901,14 +904,15 @@ class ItemsController extends Controller
         ->innerJoin('invoices I', 'T.invoice_id = I.id')
         ->where([
             'I.status' => 'PAID',
-            'T.invoice_id' => $id,
-            'I.branch_id' => $branchId
+            'T.invoice_id' => $id
         ])
         ->groupBy('T.ts_time')
-        ->orderBy('T.id DESC')
-        ->one();
+        ->orderBy('T.id DESC');
+        BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+        $receipt_details = $receiptDetailsQuery->one();
 
-        $station = User::findOne(Yii::$app->user->id)->branch;
+        $invoice = Invoices::findOne($id);
+        $station = $invoice ? Branch::findOne($invoice->branch_id) : User::findOne(Yii::$app->user->id)->branch;
 
         $query = (new \yii\db\Query())
         ->from('transactions')
@@ -916,7 +920,7 @@ class ItemsController extends Controller
         $modelsumt = $query->sum('price * quantity');
 
 
-        $receipt_items = (new \yii\db\Query())
+        $receiptItemsQuery = (new \yii\db\Query())
         ->select([
             'T.id', 'I.name', 'T.price',
             'T.quantity', 'I.supplier', 'I.vat',
@@ -926,11 +930,11 @@ class ItemsController extends Controller
         ->innerJoin('transactions T', 'T.item_id = I.id')
         ->where(
             [
-                'T.invoice_id' => $id,
-                'I.branch_id' => $branchId
+                'T.invoice_id' => $id
             ]
-        )
-        ->all();
+        );
+        BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+        $receipt_items = $receiptItemsQuery->all();
 
         return $this->render('receipt_final', [
             'receipt_items' => $receipt_items,
@@ -1142,14 +1146,16 @@ class ItemsController extends Controller
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
         $connection = \Yii::$app->db;
+        $params = [];
+        $branchScope = BranchAccess::sqlCondition('I.branch_id', $branchId, $params);
         $sql = "SELECT 
         T.id, I.name,I.sprice,T.quantity,I.supplier,
         I.vat,I.unit,T.status,T.ts_time 
         FROM items I,transactions T 
         WHERE I.id = T.item_id 
         AND T.status != 'unsold' 
-        AND I.branch_id = '".$branchId."'";
-        $model = $connection->createCommand($sql);
+        AND {$branchScope}";
+        $model = $connection->createCommand($sql, $params);
         $provider_itemsa = $model->queryAll();
 
         $count = sizeof($provider_itemsa);
@@ -1157,6 +1163,7 @@ class ItemsController extends Controller
 
 $dataProvider = new SqlDataProvider([
             'sql' => $sql,
+            'params' => $params,
             'totalCount' => $count,
             'pagination' => [
                 'pageSize' => 10,
@@ -1171,11 +1178,13 @@ $dataProvider = new SqlDataProvider([
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
         $connection = \Yii::$app->db;
+        $params = [];
+        $branchScope = BranchAccess::sqlCondition('I.branch_id', $branchId, $params);
         $sql = "SELECT T.id, I.name,I.sprice,I.bprice,T.quantity,I.supplier,
         I.vat,I.unit,T.status,T.ts_time FROM items I,transactions T 
         WHERE I.id = T.item_id
-        AND I.branch_id = '".$branchId."'";
-        $model = $connection->createCommand($sql);
+        AND {$branchScope}";
+        $model = $connection->createCommand($sql, $params);
         $provider_itemsa = $model->queryAll();
 
         $count = sizeof($provider_itemsa);
@@ -1183,6 +1192,7 @@ $dataProvider = new SqlDataProvider([
 
         $dataProvider = new SqlDataProvider([
             'sql' => $sql,
+            'params' => $params,
             'totalCount' => $count,
             'pagination' => [
                 'pageSize' => 10,
@@ -1199,6 +1209,10 @@ $dataProvider = new SqlDataProvider([
         $modelt = new Transactions();
         $connection = \Yii::$app->db;
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
+        $itemParams = [];
+        $itemBranchScope = BranchAccess::sqlCondition('I.branch_id', $branchId, $itemParams);
+        $expenseParams = [];
+        $expenseBranchScope = BranchAccess::sqlCondition('branch_id', $branchId, $expenseParams);
 
         if (isset($_POST['Transactions']['ts_time'])) {
 
@@ -1210,13 +1224,13 @@ $dataProvider = new SqlDataProvider([
             AND II.id = T.invoice_id
             AND DATE(T.ts_time) BETWEEN '" . $sdate[0] . "' AND '" . $sdate[1] . "'
             AND II.status='PAID' AND
-            I.branch_id = '".$branchId."'";
+            {$itemBranchScope}";
 
             $sql2 = "SELECT ename,etype,edate,amount,company,phone 
             FROM expenditures 
             WHERE 
             edate BETWEEN '" . $sdate[0] . "' AND '" . $sdate[1] . "'
-            AND branch_id = '".$branchId."'";
+            AND {$expenseBranchScope}";
 
             $pdate = $_POST['Transactions']['ts_time'];
         } else {
@@ -1228,17 +1242,17 @@ $dataProvider = new SqlDataProvider([
             AND II.id = T.invoice_id
             AND DATE(T.ts_time) = '" . $date_today . "'
             AND II.status='PAID' AND
-            I.branch_id = '".$branchId."'";
+            {$itemBranchScope}";
 
             $sql2 = "SELECT ename,etype,edate,amount,company,phone
              FROM expenditures WHERE edate = '" . $date_today . "' 
-             AND branch_id = '".$branchId."'";
+             AND {$expenseBranchScope}";
             $pdate = 0;
         }
-        $model = $connection->createCommand($sql1);
+        $model = $connection->createCommand($sql1, $itemParams);
         $provider_trans = $model->queryAll();
 
-        $model2 = $connection->createCommand($sql2);
+        $model2 = $connection->createCommand($sql2, $expenseParams);
         $provider_expend = $model2->queryAll();
 
         return $this->render('profitsn', [
@@ -1256,6 +1270,8 @@ $dataProvider = new SqlDataProvider([
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
         $connection = \Yii::$app->db;
+        $params = [];
+        $branchScope = BranchAccess::sqlCondition('I.branch_id', $branchId, $params);
         $sql = "SELECT ts_time,T.item_id AS nitem,
         U.first_name,
         U.last_name,
@@ -1267,16 +1283,17 @@ $dataProvider = new SqlDataProvider([
         WHERE I.id = T.item_id 
         AND T.user_id = U.id 
         AND T.status = 'invoice' 
-        AND I.branch_id = '".$branchId."'
+        AND {$branchScope}
         GROUP BY ('ts_time')";
 
-        $model = $connection->createCommand($sql);
+        $model = $connection->createCommand($sql, $params);
         $provider_itemsa = $model->queryAll();
         $count = sizeof($provider_itemsa);
 
 
         $dataProvider = new SqlDataProvider([
             'sql' => $sql,
+            'params' => $params,
             'totalCount' => $count,
             'pagination' => [
                 'pageSize' => 10,
@@ -1294,6 +1311,8 @@ $dataProvider = new SqlDataProvider([
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
         $connection = \Yii::$app->db;
+        $params = [];
+        $branchScope = BranchAccess::sqlCondition('I.branch_id', $branchId, $params);
         $sql = "SELECT 
         T.ts_time,C.fname,C.lname,C.phone,C.company,U.first_name,
         U.last_name,V.invoiceno,
@@ -1305,9 +1324,9 @@ $dataProvider = new SqlDataProvider([
         AND U.id = T.user_id 
         AND V.id = T.invoice_id 
         AND V.status = 'PAID'
-        AND I.branch_id = '".$branchId."'
+        AND {$branchScope}
         GROUP BY T.ts_time";
-        $model = $connection->createCommand($sql);
+        $model = $connection->createCommand($sql, $params);
         $provider_itemsa = $model->queryAll();
 
 
@@ -1316,6 +1335,7 @@ $dataProvider = new SqlDataProvider([
 
         $dataProvider = new SqlDataProvider([
             'sql' => $sql,
+            'params' => $params,
             'totalCount' => $count,
             'pagination' => [
                 'pageSize' => 10,
@@ -1344,7 +1364,7 @@ $dataProvider = new SqlDataProvider([
     public function actionInvoiceprint($id)
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $receipt_details = (new \yii\db\Query())
+        $receiptDetailsQuery = (new \yii\db\Query())
         ->select([
             'DISTINCT(T.ts_time) AS pdatetime', 'T.id', 'U.first_name', 'U.last_name',
             'C.clogo', 'I.status', 'C.fname', 'C.lname', 'C.phone', 'C.company',
@@ -1355,14 +1375,14 @@ $dataProvider = new SqlDataProvider([
         ->innerJoin('user U', 'T.user_id = U.id')
         ->innerJoin('invoices I', 'T.invoice_id = I.id')
         ->where([
-            'T.invoice_id' => $id,
-            'I.branch_id' => $branchId
+            'T.invoice_id' => $id
         ])
-        ->orderBy('T.id DESC')
-        ->one();
+        ->orderBy('T.id DESC');
+        BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+        $receipt_details = $receiptDetailsQuery->one();
 
 
-        $receipt_items = (new \yii\db\Query())
+        $receiptItemsQuery = (new \yii\db\Query())
         ->select([
             'T.id', 'I.name', 'T.price',
             'T.quantity', 'I.supplier', 'I.vat',
@@ -1372,13 +1392,14 @@ $dataProvider = new SqlDataProvider([
         ->innerJoin('transactions T', 'T.item_id = I.id')
         ->where(
             [
-                'T.invoice_id' => $id,
-                'I.branch_id' => $branchId
+                'T.invoice_id' => $id
             ]
-        )
-        ->all();
+        );
+        BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+        $receipt_items = $receiptItemsQuery->all();
 
-        $station = User::findOne(Yii::$app->user->id)->branch;
+        $invoice = Invoices::findOne($id);
+        $station = $invoice ? Branch::findOne($invoice->branch_id) : User::findOne(Yii::$app->user->id)->branch;
         $content = $this->renderPartial('invoice_print', [
             'receipt_items' => $receipt_items,
             'receipt_details' => $receipt_details,
@@ -1421,7 +1442,7 @@ $dataProvider = new SqlDataProvider([
 
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
 
-        $receipt_details = (new \yii\db\Query())
+        $receiptDetailsQuery = (new \yii\db\Query())
         ->select([
             'T.ts_time AS pdatetime', 'T.id', 'U.first_name', 'U.last_name',
             'C.clogo', 'I.status', 'C.fname', 'C.lname', 'C.phone', 'C.company',
@@ -1432,20 +1453,20 @@ $dataProvider = new SqlDataProvider([
         ->innerJoin('user U', 'T.user_id = U.id')
         ->innerJoin('invoices I', 'T.invoice_id = I.id')
         ->where([
-            'T.invoice_id' => $id,
-            'I.branch_id' => $branchId
+            'T.invoice_id' => $id
         ])
         ->groupBy(['T.id','T.ts_time', 'T.ts_time', 'T.id', 'U.first_name', 'U.last_name',
         'C.clogo', 'I.status', 'C.fname', 'C.lname', 'C.phone', 'C.company',
         'C.address', 'I.invoiceno', 'I.id'])
-        ->orderBy('T.id DESC')
-        ->one();
+        ->orderBy('T.id DESC');
+        BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+        $receipt_details = $receiptDetailsQuery->one();
 
         $query = (new \yii\db\Query())->from('transactions')
         ->where(['invoice_id' => $id]);
         $modelsumt = $query->sum('price * quantity');
 
-        $receipt_items = (new \yii\db\Query())
+        $receiptItemsQuery = (new \yii\db\Query())
         ->select([
             'T.id', 'I.name', 'T.price',
             'T.quantity', 'I.supplier', 'I.vat',
@@ -1455,13 +1476,14 @@ $dataProvider = new SqlDataProvider([
         ->innerJoin('transactions T', 'T.item_id = I.id')
         ->where(
             [
-                'T.invoice_id' => $id,
-                'I.branch_id' => $branchId
+                'T.invoice_id' => $id
             ]
-        )
-        ->all();
+        );
+        BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+        $receipt_items = $receiptItemsQuery->all();
 
-        $station = User::findOne(Yii::$app->user->id)->branch;
+        $invoice = Invoices::findOne($id);
+        $station = $invoice ? Branch::findOne($invoice->branch_id) : User::findOne(Yii::$app->user->id)->branch;
 
 
         // $pdf = Yii::$app->pdf;

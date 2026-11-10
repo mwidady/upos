@@ -12,6 +12,7 @@ use app\models\Transactions;
 use app\models\LoginForm;
 use app\models\ContactForm;
 use yii\web\Response;
+use app\components\BranchAccess;
 
 class SiteController extends Controller
 {
@@ -71,6 +72,8 @@ class SiteController extends Controller
         $user = User::findOne(Yii::$app->user->id);
         $branchId = $user->branch_id;
         $db = Yii::$app->db;
+        $summaryParams = [];
+        $invoiceScope = BranchAccess::sqlCondition('branch_id', $branchId, $summaryParams);
 
         $summary = $db->createCommand(
             "SELECT COUNT(*) AS invoice_count,
@@ -78,40 +81,53 @@ class SiteController extends Controller
                     COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount ELSE 0 END), 0) AS paid_total,
                     COALESCE(SUM(CASE WHEN status <> 'PAID' THEN amount ELSE 0 END), 0) AS outstanding_total
              FROM invoices
-             WHERE branch_id = :branchId",
-            [':branchId' => $branchId]
+             WHERE {$invoiceScope}",
+            $summaryParams
         )->queryOne();
 
-        $summary['item_count'] = (int) Items::find()->where(['branch_id' => $branchId])->count();
-        $summary['user_count'] = (int) User::find()->where(['branch_id' => $branchId])->count();
+        $itemQuery = Items::find();
+        BranchAccess::apply($itemQuery, 'branch_id', $branchId);
+        $summary['item_count'] = (int) $itemQuery->count();
+        $userQuery = User::find();
+        BranchAccess::apply($userQuery, 'branch_id', $branchId);
+        $summary['user_count'] = (int) $userQuery->count();
+
+        $customerParams = [];
+        $customerScope = BranchAccess::sqlCondition('branch_id', $branchId, $customerParams);
         $summary['customer_count'] = (int) $db->createCommand(
-            'SELECT COUNT(*) FROM customers WHERE branch_id = :branchId',
-            [':branchId' => $branchId]
+            "SELECT COUNT(*) FROM customers WHERE {$customerScope}",
+            $customerParams
         )->queryScalar();
+
+        $lowStockParams = [];
+        $lowStockScope = BranchAccess::sqlCondition('i.branch_id', $branchId, $lowStockParams);
         $summary['low_stock_count'] = (int) $db->createCommand(
             'SELECT COUNT(*) FROM items i
              LEFT JOIN quantity_total q ON q.item_id = i.id
-             WHERE i.branch_id = :branchId AND COALESCE(q.quantity_t, 0) <= 5',
-            [':branchId' => $branchId]
+             WHERE ' . $lowStockScope . ' AND COALESCE(q.quantity_t, 0) <= 5',
+            $lowStockParams
         )->queryScalar();
 
+        $latestDateParams = [];
+        $latestDateScope = BranchAccess::sqlCondition('branch_id', $branchId, $latestDateParams);
         $latestDate = $db->createCommand(
-            'SELECT MAX(DATE(created_at)) FROM invoices WHERE branch_id = :branchId',
-            [':branchId' => $branchId]
+            "SELECT MAX(DATE(created_at)) FROM invoices WHERE {$latestDateScope}",
+            $latestDateParams
         )->queryScalar();
         $periodEnd = new \DateTimeImmutable($latestDate ?: 'today');
         $periodStart = $periodEnd->modify('-6 days');
 
+        $salesParams = [];
+        $salesScope = BranchAccess::sqlCondition('branch_id', $branchId, $salesParams);
         $salesRows = $db->createCommand(
             'SELECT DATE(created_at) AS sale_day, COALESCE(SUM(amount), 0) AS total
              FROM invoices
-             WHERE branch_id = :branchId AND DATE(created_at) BETWEEN :periodStart AND :periodEnd
+             WHERE ' . $salesScope . ' AND DATE(created_at) BETWEEN :periodStart AND :periodEnd
              GROUP BY DATE(created_at)',
-            [
-                ':branchId' => $branchId,
+            array_merge($salesParams, [
                 ':periodStart' => $periodStart->format('Y-m-d'),
                 ':periodEnd' => $periodEnd->format('Y-m-d'),
-            ]
+            ])
         )->queryAll();
         $salesByDay = array_column($salesRows, 'total', 'sale_day');
         $dailySales = [];
@@ -124,27 +140,33 @@ class SiteController extends Controller
             ];
         }
 
+        $statusParams = [];
+        $statusScope = BranchAccess::sqlCondition('branch_id', $branchId, $statusParams);
         $statusRows = $db->createCommand(
             'SELECT status, COUNT(*) AS total FROM invoices
-             WHERE branch_id = :branchId GROUP BY status ORDER BY total DESC',
-            [':branchId' => $branchId]
+             WHERE ' . $statusScope . ' GROUP BY status ORDER BY total DESC',
+            $statusParams
         )->queryAll();
         $invoiceStatuses = array_map(function ($row) {
             return ['label' => $row['status'] ?: 'Unknown', 'value' => (int) $row['total']];
         }, $statusRows);
 
+        $topProductParams = [];
+        $topProductScope = BranchAccess::sqlCondition('inv.branch_id', $branchId, $topProductParams);
         $topProducts = $db->createCommand(
             'SELECT i.name, COALESCE(SUM(t.quantity), 0) AS quantity
              FROM transactions t
              INNER JOIN items i ON i.id = t.item_id
              INNER JOIN invoices inv ON inv.id = t.invoice_id
-             WHERE inv.branch_id = :branchId
+             WHERE ' . $topProductScope . '
              GROUP BY i.id, i.name
              ORDER BY quantity DESC
              LIMIT 5',
-            [':branchId' => $branchId]
+            $topProductParams
         )->queryAll();
 
+        $activityParams = [];
+        $activityScope = BranchAccess::sqlCondition('inv.branch_id', $branchId, $activityParams);
         $activityRows = $db->createCommand(
             "SELECT CASE
                         WHEN HOUR(COALESCE(t.ts_time, t.trans_date)) < 10 THEN 'Opening'
@@ -155,9 +177,9 @@ class SiteController extends Controller
                     COUNT(*) AS total
              FROM transactions t
              INNER JOIN invoices inv ON inv.id = t.invoice_id
-             WHERE inv.branch_id = :branchId
+             WHERE {$activityScope}
              GROUP BY period_name",
-            [':branchId' => $branchId]
+            $activityParams
         )->queryAll();
         $activityMap = array_column($activityRows, 'total', 'period_name');
         $activity = [];
@@ -165,15 +187,17 @@ class SiteController extends Controller
             $activity[] = ['label' => $period, 'value' => (int) ($activityMap[$period] ?? 0)];
         }
 
+        $recentParams = [];
+        $recentScope = BranchAccess::sqlCondition('inv.branch_id', $branchId, $recentParams);
         $recentInvoices = $db->createCommand(
             'SELECT inv.invoiceno, inv.amount, inv.status, inv.created_at,
                     CONCAT(c.fname, " ", c.lname) AS customer_name
              FROM invoices inv
              LEFT JOIN customers c ON c.id = inv.customer_id
-             WHERE inv.branch_id = :branchId
+             WHERE ' . $recentScope . '
              ORDER BY inv.created_at DESC, inv.id DESC
              LIMIT 4',
-            [':branchId' => $branchId]
+            $recentParams
         )->queryAll();
 
         return $this->render('index', [

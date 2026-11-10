@@ -28,7 +28,9 @@ class AuditTrailsController extends Controller
     protected function findModel($id)
     {
         $identity = User::findOne(Yii::$app->user->id);
-        $model = AuditTrail::findOne(['id' => $id, 'branch_id' => $identity->branch_id]);
+        $query = AuditTrail::find()->where(['id' => $id]);
+        \app\components\BranchAccess::apply($query, 'branch_id', $identity->branch_id);
+        $model = $query->one();
         if ($model !== null) { return $model; }
         throw new NotFoundHttpException('The requested audit entry does not exist.');
     }

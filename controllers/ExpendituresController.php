@@ -172,7 +172,9 @@ class ExpendituresController extends Controller
     protected function findModel($id)
     {
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        if (($model = Expenditures::findOne(['id' => $id, 'branch_id' => $branchId])) !== null) {
+        $query = Expenditures::find()->where(['id' => $id]);
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
+        if (($model = $query->one()) !== null) {
             return $model;
         } else {
             throw new NotFoundHttpException('The requested page does not exist.');

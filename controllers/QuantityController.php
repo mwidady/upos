@@ -85,19 +85,22 @@ class QuantityController extends Controller
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
 
         $connection = \Yii::$app->db;
+        $params = [];
+        $branchScope = \app\components\BranchAccess::sqlCondition('I.branch_id', $branchId, $params);
         $sql = "SELECT I.name,Q.quantity_t,Q.last_update 
         FROM items I
         LEFT JOIN quantity_total Q 
         ON I.id = Q.item_id 
-        WHERE I.branch_id = '".$branchId."'
+        WHERE {$branchScope}
         ORDER BY quantity_t DESC";
-        $modelt = $connection->createCommand($sql);
+        $modelt = $connection->createCommand($sql, $params);
         $provider_quantitya= $modelt->queryAll();
 
         $count = sizeof($provider_quantitya);
 
         $dataProvider = new SqlDataProvider([
             'sql' => $sql,
+            'params' => $params,
             'totalCount' => $count,
             'pagination' => [
                 'pageSize' => 20,
@@ -107,7 +110,9 @@ class QuantityController extends Controller
         $model = new Quantity();
         $modelTotal = new QuantityTotal();
 
-        $allItems=Items::find()->where(['branch_id'=>$branchId])->all();
+        $itemQuery = Items::find();
+        \app\components\BranchAccess::apply($itemQuery, 'branch_id', $branchId);
+        $allItems = $itemQuery->all();
 
         if ($model->load(Yii::$app->request->post())) {
 
@@ -143,12 +148,14 @@ class QuantityController extends Controller
     public function actionStock(){
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
         $connection = \Yii::$app->db;
+        $params = [];
+        $branchScope = \app\components\BranchAccess::sqlCondition('I.branch_id', $branchId, $params);
         $sql ="SELECT I.name,I.bprice,I.sprice,I.vat,Q.quantity_t 
         FROM items I LEFT JOIN quantity_total Q 
         ON I.id = Q.item_id 
-        WHERE I.branch_id = '" . $branchId . "'
+        WHERE {$branchScope}
         ORDER BY Q.quantity_t DESC";
-        $modeli = $connection->createCommand($sql);
+        $modeli = $connection->createCommand($sql, $params);
         $provider_itemsa= $modeli->queryAll();
 
         $count = sizeof($provider_itemsa);
@@ -156,6 +163,7 @@ class QuantityController extends Controller
 
         $dataProvider = new SqlDataProvider([
             'sql' => $sql,
+            'params' => $params,
             'totalCount' => $count,
             'pagination' => [
                 'pageSize' => 20,

@@ -45,8 +45,8 @@ class ItemsSearch extends Items
 
         $branchId= User::findOne(Yii::$app->user->id)->branch_id;
 
-        $query = Items::find()->where(['branch_id'=>$branchId])
-        ->orderBy('id DESC');
+        $query = Items::find()->orderBy('id DESC');
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
 
         // add conditions that should always apply here
 

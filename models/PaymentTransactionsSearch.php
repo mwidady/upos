@@ -44,8 +44,8 @@ class PaymentTransactionsSearch extends PaymentTransactions
     {
         $branchId= User::findOne(Yii::$app->user->id)->branch_id;
         
-        $query = PaymentTransactions::find()->joinWith('invoice')
-        ->where(['invoices.branch_id'=>$branchId]);
+        $query = PaymentTransactions::find()->joinWith('invoice');
+        \app\components\BranchAccess::apply($query, 'invoices.branch_id', $branchId);
 
         // add conditions that should always apply here
 

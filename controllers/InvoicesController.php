@@ -19,6 +19,7 @@ use yii\filters\VerbFilter;
 use yii\web\Response;
 use app\models\Workflow;
 use app\models\WorkflowConstant;
+use app\components\BranchAccess;
 
 /**
  * InvoicesController implements the CRUD actions for Invoices model.
@@ -68,7 +69,7 @@ class InvoicesController extends Controller
     public function actionView($id)
     {
      $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-    $receipt_details = (new \yii\db\Query())
+    $receiptDetailsQuery = (new \yii\db\Query())
     ->select([
     'DISTINCT(T.ts_time) AS pdatetime',
     'T.id',
@@ -83,14 +84,14 @@ class InvoicesController extends Controller
     ->innerJoin('invoices I','T.invoice_id = I.id')
     ->where([
         'T.status'=>'invoice',
-        'T.invoice_id'=> $id,
-        'I.branch_id' => $branchId
+        'T.invoice_id'=> $id
         ])
-        ->orderBy('T.id DESC')
-    ->one();
+        ->orderBy('T.id DESC');
+    BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+    $receipt_details = $receiptDetailsQuery->one();
 
 
-    $receipt_items = (new \yii\db\Query())
+    $receiptItemsQuery = (new \yii\db\Query())
     ->select(['T.id', 'I.name','T.price',
     'T.quantity','I.supplier','I.vat',
     'I.unit','T.ts_time'])
@@ -98,17 +99,19 @@ class InvoicesController extends Controller
     ->innerJoin('transactions T','T.item_id = I.id')
     ->where(
         [
-            'T.invoice_id' => $id,
-            'I.branch_id' => $branchId
+            'T.invoice_id' => $id
         ]
         )
-    ->all();
+    ;
+    BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+    $receipt_items = $receiptItemsQuery->all();
     
-         $payPartial = Workflow::find()
-         ->where(['branch_id' => $branchId,'workflow_code' => WorkflowConstant::PARTIAL_PAYMENT])
-         ->count();   
+         $workflowQuery = Workflow::find()->where(['workflow_code' => WorkflowConstant::PARTIAL_PAYMENT]);
+         BranchAccess::apply($workflowQuery, 'branch_id', $branchId);
+         $payPartial = $workflowQuery->count();
 
-        $station = User::findOne(Yii::$app->user->id)->branch;
+        $invoiceModel = Invoices::findOne($id);
+        $station = $invoiceModel ? Branch::findOne($invoiceModel->branch_id) : User::findOne(Yii::$app->user->id)->branch;
 
         return $this->render('invoice', [
             'receipt_items' => $receipt_items,
@@ -183,7 +186,7 @@ class InvoicesController extends Controller
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $invoices = Invoices::find()
+        $invoiceQuery = Invoices::find()
         ->select([
         'invoices.id',
         'invoices.invoiceno',
@@ -192,10 +195,9 @@ class InvoicesController extends Controller
         'invoices.amount'
         ])
     ->leftJoin('customers', 'customers.id = invoices.customer_id')
-    ->where(['invoices.branch_id' => $branchId])
-    ->orderBy(['invoices.id' => SORT_DESC])
-    ->asArray()
-    ->all();
+    ->orderBy(['invoices.id' => SORT_DESC]);
+        BranchAccess::apply($invoiceQuery, 'invoices.branch_id', $branchId);
+        $invoices = $invoiceQuery->asArray()->all();
         return [
             'status' => 'success',
             'data' => $invoices,
@@ -207,7 +209,7 @@ class InvoicesController extends Controller
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $items = Items::find()
+        $itemQuery = Items::find()
         ->alias('i')
         ->select([
             'i.id',
@@ -216,10 +218,9 @@ class InvoicesController extends Controller
             'quantity' => 'qt.quantity_t'
         ])
         ->leftJoin('quantity_total qt', 'qt.item_id = i.id')
-        ->where(['i.branch_id' => $branchId])
-        ->orderBy(['i.id' => SORT_DESC])
-        ->asArray()
-        ->all();
+        ->orderBy(['i.id' => SORT_DESC]);
+        BranchAccess::apply($itemQuery, 'i.branch_id', $branchId);
+        $items = $itemQuery->asArray()->all();
         
         return [
             'status' => 'success',
@@ -359,7 +360,8 @@ class InvoicesController extends Controller
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
         
-        $branch = Branch::findOne($branchId);
+        $invoice = Invoices::findOne($id);
+        $branch = $invoice ? Branch::findOne($invoice->branch_id) : Branch::findOne($branchId);
     
         $receiptDetails = (new \yii\db\Query())
             ->select([
@@ -407,9 +409,16 @@ class InvoicesController extends Controller
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
          
-        $items = Items::find()->where(['branch_id' => $branchId])->count();
-        $invoices = Invoices::find()->where(['branch_id' => $branchId])->count();
-        $customers = Customers::find()->count();
+        $branchId = User::findOne(Yii::$app->user->id)->branch_id;
+        $itemQuery = Items::find();
+        BranchAccess::apply($itemQuery, 'branch_id', $branchId);
+        $items = $itemQuery->count();
+        $invoiceQuery = Invoices::find();
+        BranchAccess::apply($invoiceQuery, 'branch_id', $branchId);
+        $invoices = $invoiceQuery->count();
+        $customerQuery = Customers::find();
+        BranchAccess::apply($customerQuery, 'branch_id', $branchId);
+        $customers = $customerQuery->count();
     
        $dashboards['items'] = $items;
        $dashboards['invoices'] = $invoices;
@@ -435,27 +444,25 @@ class InvoicesController extends Controller
         $branchId = User::findOne(Yii::$app->user->id)->branch_id;
 
     if($reportType == 'COLLECTION'){
-        $totalAmount = Invoices::find()
-        ->where(['branch_id' => $branchId])
-        ->andWhere(['between', 'created_at', $startDate, $endDate])
-        ->sum('amount');
+        $query = Invoices::find()->andWhere(['between', 'created_at', $startDate, $endDate]);
+        BranchAccess::apply($query, 'branch_id', $branchId);
+        $totalAmount = $query->sum('amount');
     }
     
     if($reportType == 'PROFIT'){
-        $totalSell = Invoices::find()
-        ->where(['branch_id' => $branchId])
-        ->andWhere(['between', 'created_at', $startDate, $endDate])
-        ->sum('amount');
+        $sellQuery = Invoices::find()->andWhere(['between', 'created_at', $startDate, $endDate]);
+        BranchAccess::apply($sellQuery, 'branch_id', $branchId);
+        $totalSell = $sellQuery->sum('amount');
         
-        $totalBuy = (new \yii\db\Query())
+        $totalBuyQuery = (new \yii\db\Query())
         ->select(['total2' => 'SUM(it.bprice * t.quantity)'])
         ->from(['it' => 'items'])
         ->innerJoin(['t' => 'transactions'], 'it.id = t.item_id')
         ->innerJoin(['inv' => 'invoices'], 'inv.id = t.invoice_id')
         ->where(['between', 'DATE(inv.created_at)', $startDate, $endDate])
-        ->andWhere(['inv.status' => 'PAID'])
-        ->andWhere(['inv.branch_id' => $branchId])
-        ->scalar();
+        ->andWhere(['inv.status' => 'PAID']);
+        BranchAccess::apply($totalBuyQuery, 'inv.branch_id', $branchId);
+        $totalBuy = $totalBuyQuery->scalar();
     
         $totalAmount = (float)$totalSell - (float)$totalBuy;
         

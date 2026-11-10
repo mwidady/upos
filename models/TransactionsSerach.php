@@ -48,8 +48,8 @@ class TransactionsSerach extends Transactions
         
         $query = Transactions::find()->joinWith('item')->joinWith('invoice')
         ->where(['invoices.status' => 'PAID'])
-        ->where(['invoices.branch_id'=>$branchId])
         ->orderBy('transactions.id DESC');
+        \app\components\BranchAccess::apply($query, 'invoices.branch_id', $branchId);
 
         // add conditions that should always apply here
 

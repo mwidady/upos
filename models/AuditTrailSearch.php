@@ -21,7 +21,8 @@ class AuditTrailSearch extends AuditTrail
     {
         $identity = User::findOne(Yii::$app->user->id);
         $query = AuditTrail::find()->alias('audit')->joinWith(['user auditUser'])
-            ->andWhere(['audit.branch_id' => $identity->branch_id])->orderBy(['audit.id' => SORT_DESC]);
+            ->orderBy(['audit.id' => SORT_DESC]);
+        \app\components\BranchAccess::apply($query, 'audit.branch_id', $identity->branch_id);
         $provider = new ActiveDataProvider(['query' => $query, 'pagination' => ['pageSize' => 25]]);
         $provider->sort->attributes['username'] = ['asc' => ['auditUser.username' => SORT_ASC], 'desc' => ['auditUser.username' => SORT_DESC]];
         $this->load($params);

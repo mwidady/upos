@@ -44,9 +44,8 @@ class ExpendituresSearch extends Expenditures
     {
         $branchId= User::findOne(Yii::$app->user->id)->branch_id;
         
-        $query = Expenditures::find()
-        ->where(['branch_id'=>$branchId])
-        ->orderBy('id DESC');
+        $query = Expenditures::find()->orderBy('id DESC');
+        \app\components\BranchAccess::apply($query, 'branch_id', $branchId);
 
         // add conditions that should always apply here
 

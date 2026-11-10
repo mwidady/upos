@@ -41,8 +41,8 @@ class QuantitySearch extends Quantity
      */
     public function search($params,$branchId)
     {
-        $query = Quantity::find()->joinWith('item') // use relation for join
-        ->where(['items.branch_id' => $branchId]);
+        $query = Quantity::find()->joinWith('item'); // use relation for join
+        \app\components\BranchAccess::apply($query, 'items.branch_id', $branchId);
 
         // add conditions that should always apply here
 
