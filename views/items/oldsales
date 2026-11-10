@@ -1,0 +1,255 @@
+<?php
+
+use yii\helpers\Html;
+use yii\widgets\ActiveForm;
+use yii\helpers\ArrayHelper;
+use yii\helpers\Url;
+use app\models\Items;
+use kartik\select2\Select2;
+use kartik\grid\EditableColumn;
+use yii\widgets\Pjax;
+use kartik\grid\GridView;
+
+
+$img = Url::to('@web/');
+$this->registerJs(
+    '$(document).ready(function(){
+$("#customers-id").change(function(){
+var e = document.getElementById("customers-id");
+    var strSel =  e.options[e.selectedIndex].value;
+    window.location.href="'.Yii::$app->urlManager->createUrl('category').'";
+});
+
+});', "");
+/*
+$gridColumns =[
+    ['class' => 'kartik\grid\SerialColumn'],
+    [
+        'attribute'=>'name',
+        //'value'=>'name',
+    ],
+
+    [
+        'attribute' => 'price',
+        'format'=>['decimal',2],
+        'label' => 'Amount',
+
+    ],
+    [
+        'class' => 'kartik\grid\EditableColumn',
+        'attribute' => 'quantity',
+        //'value' => $dataProvider['quantity'],
+        'width' => '30%',
+        'editableOptions' => function ($dataProvider, $key, $index) {
+            return [
+                'header' => 'Quantity',
+                'size' => 'md',
+                'name' => 'quantity',
+                'afterInput' => Html::hiddenInput('id', $key),
+                'displayValue' => $dataProvider['quantity'],
+            ];
+        }
+    ],
+    [
+        'label'=>'Total',
+        'format'=>['decimal',2],
+        'value' => 'total1',
+        'pageSummaryFunc' => GridView::F_SUM,
+        'pageSummary' => true
+
+    ],
+    ['class' => 'kartik\grid\ActionColumn',
+        'header' => 'Action',
+        'template' => '{view} {update}',
+    ],
+];
+?>
+
+<?= GridView::widget([
+    'dataProvider' => $dataProvider,
+
+
+    'showHeader' => true,
+    'columns' => $gridColumns,
+
+    'showPageSummary' => true,
+    // 'showConfirmAlert' => false,
+
+]);
+*/
+?>
+
+<div class="container-fluid">
+<div class="row-fluid">
+    <div class="span8">
+        <div class="widget-box">
+            <div class="widget-title"> <span class="icon icon-list">
+            </span>
+                <h5>Sales</h5>
+            </div>
+            <div class="widget-content">
+                <center>
+                    <?php $form = ActiveForm::begin(['method'=>'POST', 'action' => ['sales'],'enableClientValidation' => false,
+                        'enableAjaxValidation' => false]); ?>
+                   <table style="width:60%">
+                       <tr>
+
+                           <td style="padding-top:15px;">
+						 <?php
+                            $data = ArrayHelper::map(Items::find()->joinWith(['quantitytotal'
+                            => function ($query) {
+                                    $query->where('quantity_t > 0');
+                                },] )->all(),'id', 'name');
+
+                           echo $form->field($model, 'name')->widget(Select2::classname(), [
+        'model' => $model,
+        'data' => $data,
+        'attribute' => 'name',
+        'language' => 'es',
+    'options' => ['placeholder' => 'Select Item ...',],
+    'pluginOptions' => [
+    'allowClear' => true,
+	'class' => 'span12' ,'style'=>'margin-top:25px; width:100%;'
+    ],
+    ])->label(false);?>
+           </td>
+             <td><?= Html::submitButton('Select', ['class' =>'btn btn-primary']) ?></td>
+                       </tr>
+
+                   </table>
+
+                    <?php ActiveForm::end(); ?>
+                    <?php
+                    if(Yii::$app->session->hasFlash('error')){
+                     ?>
+                    <div class="alert alert-danger">
+                        <?php
+                           echo Yii::$app->session->getFlash('error');
+                        ?>
+                    </div>
+                    <?php
+                    }
+                    ?>
+                </center>
+                <table class="table table-bordered table-striped">
+                    <thead>
+                    <tr>
+                        <th><i class="icon-resize-vertical"></i>SNO</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Total</th>
+                        <th>Remove</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php
+                    $sum = 0;
+                    $count =1;
+                    foreach($provider_items AS $items) { ?>
+                        <tr>
+                            <td><center><?=$count;?></center></td>
+                            <td><?=$items['name']; ?></td>
+                            <td><?=$items['sprice'];?></td>
+                            <td>
+                                <center>
+                                    <div class="input-group">
+                                          <?php
+                                              if($items['quantity'] > 1){
+                                            ?>
+                                        <?= Html::a('<span class="glyphicon glyphicon-minus"></span>', ['items/removequantity?id='.$items['id']], ['class'=>'btn btn-danger btn-number btn-mini']) ?>
+                                          <?php }  ?>
+
+                                       <?php
+                                      $modeltt = \app\models\Transactions::find()->where(['id' => $items['id']])->one();
+                                        /*  echo EditableColumn::widget([
+                                       'model' => $modeltt,
+                                            'attribute' => 'quantity',
+                                        'id' => 'key',
+                                        'size'=> 'lg',
+                                              'afterInput' => Html::hiddenInput('editableKey',$items['id']),
+                                              'displayValue' =>  $items['quantity'],
+                                        'editableValueOptions' => ['class' => 'text-success'],
+                                               'editableOptions' => [
+                                              'formOptions' => [
+                                                  'action' => \yii\helpers\Url::to(['/path/to/ingredient_group_lang'])
+                                              ]
+                                          ]
+                                        ]);*/
+                                       ?>
+                                        <?= Html::a('<span class="glyphicon glyphicon-plus"></span>', ['items/addquantity?id='.$items['id']], ['class'=>'btn btn-success btn-number btn-mini']) ?>
+                                    </div>
+                                </center>
+                            </td>
+                            <td><center><?=$items['quantity'] * $items['sprice'];?></center></td>
+                            <td align="center">
+                              <center>
+                                  <?= Html::a('<i class="icon icon-remove"></i> <span>Remove</span>', ['items/remove?id='.$items['id']], ['class'=>'btn btn-primary btn-mini']) ?>
+                              </center>
+                            </td>
+
+                        </tr>
+                        <?php
+                        $sum += $items['quantity'] * $items['sprice'];
+                        $count++;
+                    }
+                    ?>
+                    </tbody>
+                    <fhead>
+                    <tr>
+                        <th><i class="icon-resize-vertical"></i></th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th><?=$sum;?></th>
+                        <td>
+                            <center>
+                                <?= Html::a('<i class="icon icon-remove"></i> <span>Remove All</span>', ['items/removeall'], ['class'=>'btn btn-danger btn-mini']) ?>
+                            </center>
+                        </td>
+                    </tr>
+                    </fhead>
+                </table>
+
+            </div>
+        </div>
+    </div>
+    <div class="span4">
+        <div class="widget-box">
+            <div class="widget-title"> <span class="icon icon-list">
+            </span>
+                <h5>Customer</h5>
+            </div><?php
+            if(isset($_GET['show_customer'])){
+            ?>
+            <div class="widget-content">
+
+                <?php $form = ActiveForm::begin(['action' =>'sell','enableAjaxValidation' => true]); ?>
+                <label>Customer Name</label>
+                <?=
+                $form->field($customer, 'id')
+                    ->dropDownList(
+                        ArrayHelper::map(\app\models\Customers::find()->all(), 'id', 'lname'), ['onchange'=>'$.get( "'.Yii::$app->urlManager->createUrl(["items/cdetails?id="]).'"+$(this).val(),function(data){
+                    $("#cdetails").html( data );
+                    })']
+                    )->label(false)
+                ?>
+
+                <hr>
+
+                <div id="cdetails"></div>
+
+                    <?= Html::a('<i class="icon icon-stop"></i> <span>Cancel</span>', ['items/removeall'], ['class'=>'btn btn-info']) ?>
+                        <?= Html::submitButton('<i class="icon icon-save"></i> <span>Sell</span>', ['class' => 'btn btn-success']) ?>
+
+                    <?php ActiveForm::end(); ?>
+                </center>
+            </div>
+            <?php
+            }
+            ?>
+        </div>
+
+    </div>
+</div>
+</div>

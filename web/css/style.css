@@ -1,0 +1,44 @@
+html,
+body {
+    font-family: Courier New,Courier,Lucida Sans Typewriter,Lucida Typewriter,monospace;
+    /* background-color:rgb(47, 155, 255) !important;   */
+}
+.station, .branch, .receiptheader{
+    text-align: center;
+}
+.invoicenoheader{
+    text-align: right;
+}
+td,th{
+    padding:40px;
+    /* border:1px solid rgb(26, 157, 209); */
+    font-size:80px !important;
+    height: 70px !important;
+}
+
+.header1, .header2, .header3, .header4,.header5{
+    display:block;
+}
+
+.header1, .header2{
+    font-weight: bold;
+}
+.header1{
+    font-size:150px;
+}
+.header2{
+    font-size:110px;
+}
+.branch{
+   text-align: left;
+}
+
+table{
+    border-collapse: none; 
+}
+
+.receiptpage {
+    border:1px solid rgb(26, 157, 209);
+    width:100%;
+    height:800px;
+  }

@@ -1,0 +1,33 @@
+
+html,
+body {
+    font-family: Courier New,Courier,Lucida Sans Typewriter,Lucida Typewriter,monospace;
+    /* background-color:rgb(47, 155, 255) !important;   */
+}
+.header1, .header2, .header3, .header4,.header5{
+    display:block;
+}
+
+.header1, .header2{
+    font-weight: bold;
+}
+.header1{
+    font-size:20px;
+}
+.header2{
+    font-size:16px;
+}
+th,td{
+    padding:10px;
+    border:1px solid #000
+}
+table{
+    border-collapse: none; 
+}
+.invoice th, .invoice td{
+    border:none;
+}
+.branch{
+    width:33%;
+
+}
