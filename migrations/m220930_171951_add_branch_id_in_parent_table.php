@@ -3,117 +3,107 @@
 use yii\db\Migration;
 
 /**
- * Class m220930_171951_add_branch_id_in_parent_table
+ * Adds branch ownership to tables that support branch-scoped data.
  */
 class m220930_171951_add_branch_id_in_parent_table extends Migration
 {
+    private function hasColumn($table, $column)
+    {
+        $schema = $this->db->schema->getTableSchema($table, true);
+
+        return $schema !== null && isset($schema->columns[$column]);
+    }
+
+    private function hasIndex($table, $indexName)
+    {
+        foreach ($this->db->schema->getTableIndexes($table, true) as $index) {
+            if ($index->name === $indexName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasForeignKey($table, $foreignKeyName)
+    {
+        foreach ($this->db->schema->getTableForeignKeys($table, true) as $foreignKey) {
+            if ($foreignKey->name === $foreignKeyName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function runIfMissing(callable $exists, callable $operation)
+    {
+        if ($exists()) {
+            return;
+        }
+
+        try {
+            $operation();
+        } catch (\yii\db\Exception $exception) {
+            // MySQL may commit earlier DDL before a migration fails.
+            if (!$exists()) {
+                throw $exception;
+            }
+        }
+    }
+
+    private function ensureBranchColumn($table, $indexName, $foreignKeyName)
+    {
+        if ($this->db->schema->getTableSchema($table, true) === null) {
+            return;
+        }
+
+        $this->runIfMissing(
+            function () use ($table) {
+                return $this->hasColumn($table, 'branch_id');
+            },
+            function () use ($table) {
+                $this->addColumn($table, 'branch_id', $this->integer()->null());
+            }
+        );
+
+        $this->runIfMissing(
+            function () use ($table, $indexName) {
+                return $this->hasIndex($table, $indexName);
+            },
+            function () use ($table, $indexName) {
+                $this->createIndex($indexName, $table, 'branch_id');
+            }
+        );
+
+        $this->runIfMissing(
+            function () use ($table, $foreignKeyName) {
+                return $this->hasForeignKey($table, $foreignKeyName);
+            },
+            function () use ($table, $foreignKeyName) {
+                $this->addForeignKey(
+                    $foreignKeyName,
+                    $table,
+                    'branch_id',
+                    'branch',
+                    'id',
+                    'CASCADE'
+                );
+            }
+        );
+    }
+
     /**
      * {@inheritdoc}
      */
     public function safeUp()
     {
-        $this->addColumn('items', 'branch_id', $this->integer()->null());
-        $this->createIndex(
-            'idx-item-branch_id',
-            'items',
-            'branch_id'
-        );
-
-        // add foreign key for table `post`
-        $this->addForeignKey(
-            'fk-item-branch_id',
-            'items',
-            'branch_id',
-            'branch',
-            'id',
-            'CASCADE'
-        );
-
-        $this->addColumn('customers', 'branch_id', $this->integer()->null());
-        $this->createIndex(
-            'idx-customer-branch_id',
-            'customers',
-            'branch_id'
-        );
-
-        // add foreign key for table `post`
-        $this->addForeignKey(
-            'fk-customer-branch_id',
-            'customers',
-            'branch_id',
-            'branch',
-            'id',
-            'CASCADE'
-        );
-
-       
-        $this->addColumn('expenditures', 'branch_id', $this->integer()->null());
-        $this->createIndex(
-            'idx-expenditure-branch_id',
-            'expenditures',
-            'branch_id'
-        );
-
-        // add foreign key for table `post`
-        $this->addForeignKey(
-            'fk-expenditure-branch_id',
-            'expenditures',
-            'branch_id',
-            'branch',
-            'id',
-            'CASCADE'
-        );
-
-        $this->addColumn('invoices', 'branch_id', $this->integer()->null());
-        $this->createIndex(
-            'idx-invoice-branch_id',
-            'invoices',
-            'branch_id'
-        );
-
-        // add foreign key for table `post`
-        $this->addForeignKey(
-            'fk-invoice-branch_id',
-            'invoices',
-            'branch_id',
-            'branch',
-            'id',
-            'CASCADE'
-        );
-
-        $this->addColumn('faq', 'branch_id', $this->integer()->null());
-        $this->createIndex(
-            'idx-faq-branch_id',
-            'faq',
-            'branch_id'
-        );
-
-        // add foreign key for table `post`
-        $this->addForeignKey(
-            'fk-faq-branch_id',
-            'faq',
-            'branch_id',
-            'branch',
-            'id',
-            'CASCADE'
-        );
-
-        $this->addColumn('batches', 'branch_id', $this->integer()->null());
-        $this->createIndex(
-            'idx-batch-branch_id',
-            'batches',
-            'branch_id'
-        );
-
-        // add foreign key for table `post`
-        $this->addForeignKey(
-            'fk-batch-branch_id',
-            'batches',
-            'branch_id',
-            'branch',
-            'id',
-            'CASCADE'
-        );
+        $this->ensureBranchColumn('items', 'idx-item-branch_id', 'fk-item-branch_id');
+        $this->ensureBranchColumn('customers', 'idx-customer-branch_id', 'fk-customer-branch_id');
+        $this->ensureBranchColumn('expenditures', 'idx-expenditure-branch_id', 'fk-expenditure-branch_id');
+        $this->ensureBranchColumn('invoices', 'idx-invoice-branch_id', 'fk-invoice-branch_id');
+        $this->ensureBranchColumn('faq', 'idx-faq-branch_id', 'fk-faq-branch_id');
+        $this->ensureBranchColumn('batches', 'idx-batch-branch_id', 'fk-batch-branch_id');
     }
 
     /**
@@ -125,19 +115,4 @@ class m220930_171951_add_branch_id_in_parent_table extends Migration
 
         return false;
     }
-
-    /*
-    // Use up()/down() to run migration code without a transaction.
-    public function up()
-    {
-
-    }
-
-    public function down()
-    {
-        echo "m220930_171951_add_branch_id_in_parent_table cannot be reverted.\n";
-
-        return false;
-    }
-    */
 }
