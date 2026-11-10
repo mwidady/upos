@@ -46,8 +46,8 @@ add('writable_dirs', [
 // Composer
 set('bin/composer', '/usr/bin/composer');
 
-// PHP
-set('bin/php', '/usr/bin/php');
+// Use the PATH-resolved CLI binary; the host's /usr/bin/php is not the CLI SAPI.
+set('bin/php', 'php');
 
 // Keep releases
 set('keep_releases', 5);
@@ -60,7 +60,7 @@ task('deploy:vendors', function () {
 
 // Yii commands
 task('deploy:yii', function () {
-    run('cd {{release_path}} && php yii cache/flush-all');
+    run('cd {{release_path}} && {{bin/php}} yii cache/flush-all');
 });
 
 // After deployment
