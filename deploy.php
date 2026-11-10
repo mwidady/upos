@@ -14,7 +14,7 @@ require 'recipe/yii.php';
 set('application', 'upos');
 
 // Git repository
-set('repository', 'git@github.com:mwidady/property.git');
+set('repository', 'git@github.com:mwidady/upos.git');
 
 // Remote server
 host('production')
