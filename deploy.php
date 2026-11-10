@@ -54,7 +54,8 @@ set('keep_releases', 5);
 
 // Install vendors
 task('deploy:vendors', function () {
-    run('cd {{release_path}} && composer install --no-dev --prefer-dist --optimize-autoloader');
+    // The release checkout lacks nested Git metadata from tracked vendor submodules.
+    run('cd {{release_path}} && rm -rf vendor && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress');
 });
 
 // Yii commands
