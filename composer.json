@@ -32,7 +32,6 @@
        "insolita/yii2-migration-generator": "2.3",
         "kartik-v/yii2-widget-depdrop": "dev-master",
         "yidas/yii2-bower-asset": "2.0.13.1",
-        "tebazil/db-seeder": "*",
         "yii2mod/yii2-rbac": "*"
 
     },
