@@ -39,8 +39,7 @@ $config = [
 
 ];
 
-if (YII_ENV) {
-    // configuration adjustments for 'dev' environment
+if (class_exists('yii\gii\Module')) {
     $config['bootstrap'][] = 'gii';
     $config['modules']['gii'] = [
         'class' => 'yii\gii\Module',
