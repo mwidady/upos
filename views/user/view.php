@@ -15,6 +15,7 @@ $this->params['breadcrumbs'][] = $this->title;
     <p>
         <?= Html::a('Update', ['update', 'id' => $model->id], ['class' => 'btn btn-primary']) ?>
         <?= Html::a('Change Password', ['setpassword', 'id' => $model->id], ['class' => 'btn btn-warning']) ?>
+        <?php if ($model->username !== 'admin' || (int) $model->status === \app\models\User::STATUS_DISABLED): ?>
         <?= Html::a(
             ((int) $model->status === \app\models\User::STATUS_ENABLED ? 'Disable User' : 'Enable User'),
             ['togglestatus', 'id' => $model->id],
@@ -26,6 +27,7 @@ $this->params['breadcrumbs'][] = $this->title;
                 ],
             ]
         ) ?>
+        <?php endif; ?>
     </p>
 
     <?= DetailView::widget([

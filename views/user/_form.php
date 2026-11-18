@@ -14,6 +14,8 @@ use yii\helpers\Url;
 /* @var $form yii\widgets\ActiveForm */
 ?>
 
+<?php $isBuiltInAdmin = !$model->isNewRecord && $model->username === 'admin'; ?>
+
 <div class="container-fluid">
     <hr>
     <div class="row-fluid">
@@ -41,7 +43,14 @@ use yii\helpers\Url;
         </div>
         <div class="control-group">
         <div class="controls">
-        <?= $form->field($model, 'username')->textInput(['maxlength' => true,'class' => 'span11']) ?>
+        <?= $form->field($model, 'username')->textInput([
+            'maxlength' => true,
+            'class' => 'span11',
+            'readonly' => $isBuiltInAdmin,
+        ]) ?>
+        <?php if ($isBuiltInAdmin): ?>
+            <p class="help-block">The built-in admin username is fixed.</p>
+        <?php endif; ?>
         </div>
         </div>
         <div class="control-group">

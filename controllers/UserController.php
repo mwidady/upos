@@ -5,6 +5,7 @@ namespace app\controllers;
 use Yii;
 use yii\filters\AccessControl;
 use app\models\User;
+use app\models\ChangePasswordForm;
 use app\models\UserSearch;
 use app\models\UserPasswordForm;
 use app\models\AuditTrail;
@@ -112,28 +113,41 @@ class UserController extends Controller
     public function actionUpdate($id)
     {
         $model = $this->findModel($id);
+        $isBuiltInAdmin = $model->username === 'admin';
         $oldValues = $this->userAuditValues($model);
 
-        if ($model->load(Yii::$app->request->post()) && $model->save(false)) {
-            AuditTrail::record(
-                AuditTrail::ACTION_UPDATE,
-                'User',
-                'id=' . $model->id,
-                $oldValues,
-                $this->userAuditValues($model),
-                'Updated user ' . $model->username
-            );
-            return $this->redirect(['view', 'id' => $model->id]);
-        } else {
-            return $this->render('update', [
-                'model' => $model,
-            ]);
+        if ($model->load(Yii::$app->request->post())) {
+            if ($isBuiltInAdmin) {
+                $model->username = 'admin';
+                $model->status = User::STATUS_ENABLED;
+            }
+
+            if ($model->save(false)) {
+                AuditTrail::record(
+                    AuditTrail::ACTION_UPDATE,
+                    'User',
+                    'id=' . $model->id,
+                    $oldValues,
+                    $this->userAuditValues($model),
+                    'Updated user ' . $model->username
+                );
+                return $this->redirect(['view', 'id' => $model->id]);
+            }
         }
+
+        return $this->render('update', [
+            'model' => $model,
+        ]);
     }
 
     public function actionToggleStatus($id)
     {
         $model = $this->findModel($id);
+
+        if ($model->username === 'admin' && (int) $model->status === User::STATUS_ENABLED) {
+            Yii::$app->session->setFlash('error', 'The built-in admin account cannot be disabled.');
+            return $this->redirect(['index']);
+        }
 
         if ($model->id == Yii::$app->user->id && (int) $model->status === User::STATUS_ENABLED) {
             Yii::$app->session->setFlash('error', 'You cannot disable your own active account.');
@@ -225,44 +239,33 @@ class UserController extends Controller
     }
     public function actionChangepassword()
     {
-        $model = new User();
-        $connection = \Yii::$app->db;
-        if ($model->load(Yii::$app->request->post())) {
+        $user = User::findOne(Yii::$app->user->id);
+        if ($user === null) {
+            throw new NotFoundHttpException('The current user could not be found.');
+        }
 
-
-            $user_id = Yii::$app->user->id;
-            $old_passord = md5($model->password);
-            $new_passord = md5($model->new_password);
-            $repeat_passord = md5($model->repeat_password);
-            $check = User::find()->where(['id' => $user_id,'password' => $old_passord])->count();
-            if($check > 0){
-
-                $connection->createCommand("UPDATE user SET password = '".$new_passord."' WHERE id='".$user_id."'")->execute();
-                AuditTrail::record(
-                    AuditTrail::ACTION_UPDATE,
-                    'User',
-                    'id=' . $user_id,
-                    [],
-                    [],
-                    'Changed own password'
-                );
-                return $this->redirect('index');
-            }else{
-                \Yii::$app->getSession()->setFlash('error', 'Invalid Password');
-                return $this->redirect('changepassword');
+        $model = new ChangePasswordForm($user);
+        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+            $user->password = md5($model->new_password);
+            if (!$user->save(false, ['password'])) {
+                throw new \RuntimeException('Unable to update the password.');
             }
 
-
-
-            //$model->authKey = '1234563';
-            //$model->save(false);
-
-
-        } else {
-            return $this->render('change_password', [
-                'model' => $model,
-            ]);
+            AuditTrail::record(
+                AuditTrail::ACTION_UPDATE,
+                'User',
+                'id=' . $user->id,
+                [],
+                [],
+                'Changed own password'
+            );
+            Yii::$app->session->setFlash('success', 'Your password has been changed.');
+            return $this->redirect(['changepassword']);
         }
+
+        return $this->render('change_password', [
+            'model' => $model,
+        ]);
     }
 
     public function actionBranch(){

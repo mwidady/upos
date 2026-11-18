@@ -72,6 +72,9 @@ $this->params['breadcrumbs'][] = $this->title;
                 },
                 'togglestatus' => function ($url, $model) {
                     $isEnabled = (int) $model->status === \app\models\User::STATUS_ENABLED;
+                    if ($model->username === 'admin' && $isEnabled) {
+                        return '';
+                    }
                     return Html::a(
                         $isEnabled ? '<span class="glyphicon glyphicon-ban-circle"></span>' : '<span class="glyphicon glyphicon-ok-circle"></span>',
                         ['togglestatus', 'id' => $model->id],

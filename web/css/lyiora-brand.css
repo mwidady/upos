@@ -20,6 +20,7 @@
 .lyiora-brand-link {
     display: inline-flex;
     align-items: center;
+    padding-top: 27px;
     gap: 11px;
     color: #f6f4ef;
     text-decoration: none;
