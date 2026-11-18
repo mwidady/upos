@@ -1159,14 +1159,14 @@ class ItemsController extends Controller
     {
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         $q = trim($q);
-        if ($q === '') {
-            return ['results' => [], 'more' => false];
-        }
 
         $user = Yii::$app->user->identity;
         $query = Customers::find()
-            ->select(['id', 'company', 'fname', 'lname'])
-            ->andWhere('(company LIKE :query OR fname LIKE :query OR lname LIKE :query)', [':query' => $q . '%'])
+            ->select(['id', 'company', 'fname', 'lname']);
+        if ($q !== '') {
+            $query->andWhere('(company LIKE :query OR fname LIKE :query OR lname LIKE :query)', [':query' => $q . '%']);
+        }
+        $query
             ->orderBy(['company' => SORT_ASC, 'fname' => SORT_ASC]);
         BranchAccess::apply($query, 'branch_id', $user->branch_id);
         $page = max(1, min((int) $page, 1000));

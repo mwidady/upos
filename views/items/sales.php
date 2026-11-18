@@ -154,7 +154,7 @@ $this->title = 'Sales';
                     ],
                     'pluginOptions' => [
                         'allowClear' => true,
-                        'minimumInputLength' => 1,
+                        'minimumInputLength' => 0,
                         'ajax' => [
                             'url' => Url::to(['/items/search-sale-customers']),
                             'dataType' => 'json',
