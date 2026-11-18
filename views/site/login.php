@@ -13,7 +13,7 @@ $this->title = 'Sign in | LYIORA POS';
     <div class="login-card">
         <section class="login-brand" aria-label="LYIORA Point of Sale">
             <div class="login-brand-glow" aria-hidden="true"></div>
-            <?= Html::img(Url::to('@web/images/lyiora-login-logo.png'), [
+            <?= Html::img(Url::to('@web/images/lyiora-logo.webp'), [
                 'class' => 'login-brand-logo',
                 'alt' => 'LYIORA',
             ]) ?>

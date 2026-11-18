@@ -25,6 +25,7 @@ class AppAsset extends AssetBundle
         'css/fullcalendar.css',
         'css/matrix-style.css',
         'css/matrix-media.css',
+        'css/lyiora-brand.css',
         'css/uniform.css',
         'css/bootstrap-wysihtml5.css',
         'css/jquery.gritter.css'

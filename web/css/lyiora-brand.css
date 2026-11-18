@@ -1,0 +1,106 @@
+#header {
+    z-index: 10;
+    border-bottom: 2px solid #c89a32;
+    background: linear-gradient(105deg, #171715, #292821);
+}
+
+#header .lyiora-brand-heading {
+    position: absolute;
+    top: 9px;
+    left: 24px;
+    z-index: 11;
+    display: flex;
+    height: 48px;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+}
+
+.lyiora-brand-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    color: #f6f4ef;
+    text-decoration: none;
+}
+
+.lyiora-brand-link:hover,
+.lyiora-brand-link:focus {
+    color: #fff;
+    text-decoration: none;
+}
+
+.lyiora-brand-mark {
+    display: block;
+    width: 42px;
+    height: 42px;
+    border: 1px solid rgba(239, 195, 76, .72);
+    border-radius: 8px;
+    background: #fff;
+    object-fit: contain;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, .22);
+}
+
+.lyiora-brand-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: #f6f4ef;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: .12em;
+}
+
+.lyiora-brand-pos {
+    padding-left: 9px;
+    border-left: 1px solid rgba(255, 255, 255, .3);
+    color: #efc34c;
+    font-size: 12px;
+    letter-spacing: .16em;
+}
+
+#search a {
+    color: #ece8dc;
+}
+
+#search a:hover,
+#search a:focus {
+    color: #efc34c;
+}
+
+#footer {
+    color: #77736a;
+    font-size: 11px;
+    letter-spacing: .08em;
+}
+
+@media (max-width: 480px) {
+    #header {
+        height: 112px;
+    }
+
+    #header .lyiora-brand-heading {
+        top: 7px;
+        left: 14px;
+    }
+
+    .lyiora-brand-mark {
+        width: 36px;
+        height: 36px;
+    }
+
+    .lyiora-brand-name {
+        font-size: 14px;
+    }
+
+    .lyiora-brand-pos {
+        font-size: 10px;
+    }
+
+    #search {
+        top: 62px;
+        right: 10px;
+        left: 10px;
+    }
+}

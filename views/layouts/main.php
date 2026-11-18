@@ -4,6 +4,7 @@
 /* @var $content string */
 
 use yii\helpers\Html;
+use yii\helpers\Url;
 use app\assets\AppAsset;
 use yii\bootstrap\Modal;
 use yii\widgets\Breadcrumbs;
@@ -21,6 +22,7 @@ $this->beginPage() ?>
     <meta charset="<?= Yii::$app->charset ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <?= Html::csrfMetaTags() ?>
+    <link rel="icon" type="image/x-icon" href="<?= Html::encode(Url::to('@web/lyiora-favicon.ico')) ?>">
     <title><?= Html::encode($this->title) ?></title>
     <?php $this->head() ?>
 <style>

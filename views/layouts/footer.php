@@ -2,7 +2,7 @@
 <!--Footer-part-->
 
 <div class="row-fluid">
-    <div id="footer" class="span12"> <?=date('Y');?> &copy; POS </div>
+    <div id="footer" class="span12"> <?=date('Y');?> &copy; LYIORA POS </div>
 </div>
 
 <!--end-Footer-part-->

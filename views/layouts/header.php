@@ -10,8 +10,16 @@ use kartik\sidenav\SideNav;
 ?>
 <!--Header-part-->
 <div id="header">
-    <h2 style="margin-left:60px; padding-top:15px">
-        <?= Html::a('POS', ['/site/index']); ?>
+    <h2 class="lyiora-brand-heading">
+        <?= Html::a(
+            Html::img(Url::to('@web/images/lyiora-mark.webp'), [
+                'class' => 'lyiora-brand-mark',
+                'alt' => '',
+                'aria-hidden' => 'true',
+            ]) . '<span class="lyiora-brand-name">LYIORA <span class="lyiora-brand-pos">POS</span></span>',
+            ['/site/index'],
+            ['class' => 'lyiora-brand-link', 'aria-label' => 'LYIORA POS home']
+        ) ?>
     </h2>
 </div>
 <!--close-Header-part-->
