@@ -109,30 +109,38 @@ use kartik\sidenav\SideNav;
                 'active' => ($controlerName == 'expenditures')
             ],
             [
-                'label' => 'Stocks <span class="pull-right badge btn-danger">3</span>',
+                'label' => 'Stocks <span class="pull-right badge btn-danger">2</span>',
                 'icon' => 'th-list',
                 'visible' => Yii::$app->user->can('Manage Item'),
                 'items' => [
                     ['label' => 'Stock Details', 'icon' => 'list', 'url' => Url::toRoute('/quantity/stock'),'active' => ($curentpage == 'quantity/stock')],
                     ['label' => 'Add Quantity', 'icon' => 'list', 'url' => Url::toRoute('/quantity/create'),'active' => ($curentpage == 'quantity/create')],
-                    ['label' => 'Quantitity Logs', 'icon' => 'list', 'url' => Url::toRoute('/quantity/index'),'active' => ($curentpage == 'quantity/index')],
                 ],
             ],
             [
                 'label' => 'Reports',
                 'icon' => 'list',
-                'visible' => Yii::$app->user->can('Manage Transaction'),
+                'visible' => Yii::$app->user->can('Manage Transaction') || Yii::$app->user->can('Manage Item'),
                 'active' => in_array($curentpage, [
                     'transactions/index',
                     'transactions/profits',
                     'invoices/index',
                     'items/profitsn',
+                    'quantity/index',
                 ]),
                 'items' => [
+                    [
+                        'label' => 'Stock Registered',
+                        'icon' => 'list',
+                        'url' => Url::toRoute('/quantity/index'),
+                        'visible' => Yii::$app->user->can('Manage Item'),
+                        'active' => ($curentpage == 'quantity/index'),
+                    ],
                     [
                         'label' => 'Sales Profits',
                         'icon' => 'file',
                         'url' => Url::toRoute('/transactions/profits'),
+                        'visible' => Yii::$app->user->can('Manage Transaction'),
                         'active' => ($curentpage == 'transactions/profits')
                     ],
                     [

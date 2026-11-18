@@ -106,7 +106,7 @@ $pdfFooter = [
         <div class="span12">
             <?php  echo $this->render('_search', ['model' => $searchModel]); ?>
         <p>
-        <?= Html::a('Create Expense', ['create'], ['class' => 'btn btn-primary']) ?>
+        <?= Html::a('Create', ['create'], ['class' => 'btn btn-primary']) ?>
         <?= Html::a('Expense Types', ['/expense-types/index'], ['class' => 'btn btn-default']) ?>
     </p><div class="widget-box">
             <?php Pjax::begin(); ?>

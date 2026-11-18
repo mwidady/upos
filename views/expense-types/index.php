@@ -12,7 +12,7 @@ $this->params['breadcrumbs'][] = $this->title;
 <div class="container-fluid">
     <div class="expense-types-index">
         <p>
-            <?= Html::a('Create Expense Type', ['create'], ['class' => 'btn btn-success']) ?>
+            <?= Html::a('Create', ['create'], ['class' => 'btn btn-success']) ?>
             <?= Html::a('View Expenses', ['/expenditures/index'], ['class' => 'btn btn-default']) ?>
         </p>
 

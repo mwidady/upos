@@ -6,7 +6,6 @@ use Yii;
 use app\models\User;
 use kartik\mpdf\Pdf;
 use app\models\Items;
-use yii\helpers\Json;
 use yii\helpers\FileHelper;
 use app\models\Batches;
 use app\models\Workflow;
@@ -1018,7 +1017,7 @@ class ItemsController extends Controller
         $customer = new Customers();
 
         if (Yii::$app->request->post('hasEditable')) {
-            $out = Json::encode(['output' => "Success", 'message' => 'Ok']);
+            $out = ['output' => '', 'message' => ''];
             // instantiate your book model for saving
             \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
 
@@ -1026,7 +1025,9 @@ class ItemsController extends Controller
             $bookId = Yii::$app->request->post('editableKey');
 
             // $bookId = 195;
-            $modeltt = Transactions::findOne($bookId);
+            $modeltt = Transactions::find()
+                ->where(['id' => $bookId, 'user_id' => $userid, 'status' => 'unsold'])
+                ->one();
 
             // store a default json response as desired by editable
             //  $out = Json::encode(['output'=>'', 'message'=>'']);
@@ -1036,22 +1037,32 @@ class ItemsController extends Controller
             // - $posted is the posted data for Book without any indexes
             // - $post is the converted array for single model validation
 
-            $posted = current($_POST['Transactions']);
+            $postedRows = Yii::$app->request->post('Transactions', []);
+            $posted = is_array($postedRows) ? reset($postedRows) : null;
+            if (!$modeltt || !is_array($posted)) {
+                return ['output' => '', 'message' => 'The cart item could not be found. Refresh the sales page and try again.'];
+            }
             $post = ['Transactions' => $posted];
             // load model like any single model validation
             // if ($modeltt->load($post)) {
             if ($modeltt->load($post)) {
                 //  $modeltt->save(false);
                 if (isset($posted['quantity'])) {
-                    $output = $posted['quantity'];
-                    $check_quantity = QuantityTotal::find()->where(['item_id' => $modeltt->item_id])->one();
+                    $quantity = filter_var($posted['quantity'], FILTER_VALIDATE_INT);
+                    $availableQuantity = (int) QuantityTotal::find()
+                        ->where(['item_id' => $modeltt->item_id])
+                        ->sum('quantity_t');
 
-                    if ($output > $check_quantity->quantity_t) {
-                        $out = Json::encode(['output' => 'OL', 'message' => 'Quantity out of stock']);
+                    if ($quantity === false || $quantity < 1) {
+                        $out['message'] = 'Quantity must be a whole number greater than zero.';
+                    } elseif ($quantity > $availableQuantity) {
+                        $out['message'] = 'Quantity out of stock. Available quantity: ' . $availableQuantity . '.';
                     } else {
-                        $connection = \Yii::$app->db;
-                        $connection->createCommand("UPDATE transactions SET quantity = '" . $output . "' WHERE id = '" . $bookId . "'")
-                            ->execute();
+                        $modeltt->quantity = $quantity;
+                        if (!$modeltt->save(false, ['quantity'])) {
+                            return ['output' => '', 'message' => 'The quantity could not be saved. Please try again.'];
+                        }
+                        $out['output'] = (string) $modeltt->quantity;
                         // custom output to return to be displayed as the editable grid cell
                         // data. Normally this is empty - whereby whatever value is edited by
                         // in the input by user is updated automatically.
@@ -1073,17 +1084,22 @@ class ItemsController extends Controller
 
 
                 if (isset($posted['price'])) {
-                    $priceEdit = $posted['price'];
-                    $connection->createCommand("UPDATE transactions SET
-                    price = '" . $priceEdit . "' WHERE id ='" . $bookId . "'")
-                        ->execute();
-                    // $out = Json::encode(['output' => $output, 'message' => 'ok']);
+                    $priceEdit = trim((string) $posted['price']);
+                    if ($priceEdit === '' || !is_numeric($priceEdit) || (float) $priceEdit < 0) {
+                        $out['message'] = 'Enter a valid price that is zero or greater.';
+                    } else {
+                        $modeltt->price = (float) $priceEdit;
+                        if (!$modeltt->save(false, ['price'])) {
+                            return ['output' => '', 'message' => 'The price could not be saved. Please try again.'];
+                        }
+                        $out['output'] = (string) $modeltt->price;
+                    }
                 }
-                // echo $out;
+            } else {
+                return ['output' => '', 'message' => 'No editable sales value was received.'];
             }
-            // return ajax json encoded response and exit
 
-            return  $this->redirect('sales?show_customer=1');
+            return $out;
         }
         if ($model->load(Yii::$app->request->post())) {
 
@@ -1124,9 +1140,20 @@ class ItemsController extends Controller
 
             return $this->redirect(['sales', 'show_customer' => '1']);
         } else {
+            $defaultCustomerQuery = Customers::find()->orderBy(['id' => SORT_ASC]);
+            BranchAccess::apply($defaultCustomerQuery, 'branch_id', $branchId);
+            $defaultCustomer = $defaultCustomerQuery->one();
+            $customerOptions = [];
+            if ($defaultCustomer) {
+                $customer->id = $defaultCustomer->id;
+                $customerName = trim($defaultCustomer->company ?: ($defaultCustomer->fname . ' ' . $defaultCustomer->lname));
+                $customerOptions[$defaultCustomer->id] = $customerName ?: 'Customer #' . $defaultCustomer->id;
+            }
+
             return $this->render('sales', [
                 'model' => $model,
                 'customer' => $customer,
+                'customerOptions' => $customerOptions,
                 'dataProvider' => $dataProvider,
             ]);
         }

@@ -13,7 +13,7 @@ $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="container-fluid">
     <p>
-        <?= Html::a('Create Customers', ['create'], ['class' => 'btn btn-primary']) ?>
+        <?= Html::a('Create', ['create'], ['class' => 'btn btn-primary']) ?>
     </p>
 <?php Pjax::begin(); ?>    <?= GridView::widget([
         'dataProvider' => $dataProvider,

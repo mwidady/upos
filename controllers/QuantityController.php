@@ -5,8 +5,10 @@ namespace app\controllers;
 use Yii;
 use app\models\User;
 use app\models\Items;
+use app\models\Branch;
 use yii\web\Controller;
 use app\models\Quantity;
+use yii\helpers\ArrayHelper;
 use yii\filters\VerbFilter;
 use app\models\QuantityTotal;
 use yii\data\SqlDataProvider;
@@ -54,12 +56,17 @@ class QuantityController extends Controller
     public function actionIndex()
     {
         $searchModel = new QuantitySearch();
-        $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        $dataProvider = $searchModel->search(Yii::$app->request->queryParams,$branchId);
+        $user = Yii::$app->user->identity;
+        $dataProvider = $searchModel->search(Yii::$app->request->queryParams, $user->branch_id);
+
+        $branchQuery = Branch::find()->orderBy(['name' => SORT_ASC]);
+        \app\components\BranchAccess::apply($branchQuery, 'id', $user->branch_id);
+        $branchOptions = ArrayHelper::map($branchQuery->all(), 'id', 'name');
 
         return $this->render('index', [
             'searchModel' => $searchModel,
             'dataProvider' => $dataProvider,
+            'branchOptions' => $branchOptions,
         ]);
     }
 

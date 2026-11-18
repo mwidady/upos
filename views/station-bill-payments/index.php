@@ -12,7 +12,7 @@ $this->params['breadcrumbs'][] = $this->title;
 <div class="container-fluid">
     <div class="station-bill-payments-index">
         <p>
-            <?= Html::a('Create Station Bill Payment', ['create'], ['class' => 'btn btn-success']) ?>
+            <?= Html::a('Create', ['create'], ['class' => 'btn btn-success']) ?>
         </p>
 
         <?php Pjax::begin(); ?>

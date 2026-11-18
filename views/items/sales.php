@@ -1,6 +1,7 @@
 <?php
 
 use yii\helpers\Url;
+use yii\helpers\Json;
 use yii\helpers\Html;
 use app\components\AppGridView as GridView;
 use kartik\select2\Select2;
@@ -8,6 +9,26 @@ use yii\widgets\ActiveForm;
 use yii\web\JsExpression;
 
 $this->title = 'Sales';
+$customerDetailsUrl = Json::htmlEncode(Url::to(['/items/cdetails']));
+$selectedCustomerId = Json::htmlEncode((string) $customer->id);
+$this->registerJs("jQuery(function($) {
+    var customerDetailsUrl = {$customerDetailsUrl};
+    $('#customers-id').on('change', function() {
+        var customerId = $(this).val();
+        if (!customerId) {
+            $('#cdetails').empty();
+            return;
+        }
+        $.get(customerDetailsUrl, {id: customerId}, function(data) {
+            $('#cdetails').html(data);
+        });
+    });
+    if ({$selectedCustomerId}) {
+        $.get(customerDetailsUrl, {id: {$selectedCustomerId}}, function(data) {
+            $('#cdetails').html(data);
+        });
+    }
+});");
 
 ?>
 
@@ -138,19 +159,16 @@ $this->title = 'Sales';
             <div class="widget-title"> <span class="icon icon-list">
             </span>
                 <h5>Customer / Company</h5>
-            </div><?php
-            if(isset($_GET['show_customer'])){
-            ?>
+            </div>
             <div class="widget-content">
 
                 <?php $form = ActiveForm::begin(['action' => ['/items/sell'], 'enableAjaxValidation' => false]); ?>
                 <label>Company Name</label>
                 <?=
                 $form->field($customer, 'id')->widget(Select2::classname(), [
-                    'data' => [],
+                    'data' => $customerOptions,
                     'options' => [
                         'placeholder' => 'Search customer or company ...',
-                        'onchange' => '$.get("' . Url::to(['/items/cdetails']) . '", {id: this.value}, function(data) { $("#cdetails").html(data); });',
                     ],
                     'pluginOptions' => [
                         'allowClear' => true,
@@ -175,11 +193,7 @@ $this->title = 'Sales';
                         <?= Html::submitButton('<i class="icon icon-save"></i> <span>Sell</span>', ['class' => 'btn btn-success']) ?>
 
                     <?php ActiveForm::end(); ?>
-                </center>
             </div>
-            <?php
-            }
-            ?>
         </div>
 
     </div>
