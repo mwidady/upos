@@ -20,6 +20,7 @@ class AppAssetLogin extends AssetBundle
     public $baseUrl = '@web';
     public $css = [
         'css/login/style-main.css',
+        'css/login/branded-login.css',
     ];
     public $js = [
          //  'js/jquery.min.js',

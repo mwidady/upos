@@ -21,7 +21,7 @@ AppAssetLogin::register($this);
     <title><?= Html::encode($this->title) ?></title>
     <?php $this->head() ?>
 </head>
-<body style="margin-top:10px;">
+<body class="login-layout">
 <?php $this->beginBody() ;
 ?>
 <?= $content ?>
