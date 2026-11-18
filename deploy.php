@@ -35,12 +35,14 @@ add('shared_files', [
 add('shared_dirs', [
     'runtime',
     'web/assets',
+    'web/uploads/stations',
 ]);
 
 // Writable directories
 add('writable_dirs', [
     'runtime',
     'web/assets',
+    'web/uploads/stations',
 ]);
 
 // Composer

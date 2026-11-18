@@ -8,6 +8,7 @@ use app\models\StationsSearch;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\filters\VerbFilter;
+use yii\helpers\FileHelper;
 use yii\web\UploadedFile;
 
 /**
@@ -68,22 +69,9 @@ class StationsController extends Controller
         $model = new Stations();
 
         if ($model->load(Yii::$app->request->post())) {
-
-            $image = UploadedFile::getInstance($model, 'slogo');
-            if (!is_null($image)) {
-                $model->slogo = $image->name;
-                $tmp = explode('.', $image->name);
-                $ext = end($tmp);
-                // generate a unique file name to prevent duplicate filenames
-                $model->slogo = Yii::$app->security->generateRandomString().".{$ext}";
-                // the path to save file, you can set an uploadPath
-                // in Yii::$app->params (as used in example below)
-                Yii::$app->params['uploadPath'] = Yii::$app->basePath . '/web/uploads/stations/';
-                $path = Yii::$app->params['uploadPath'] . $model->slogo;
-                $image->saveAs($path);
+            if ($this->saveStationLogo($model) && $model->save(false)) {
+                return $this->redirect(['view', 'id' => $model->id]);
             }
-               $model->save(false);
-              return $this->redirect(['view', 'id' => $model->id]);
         }
 
         return $this->render('create', [
@@ -102,7 +90,9 @@ class StationsController extends Controller
     {
         $model = $this->findModel($id);
 
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+        if ($model->load(Yii::$app->request->post())
+            && $this->saveStationLogo($model)
+            && $model->save()) {
             return $this->redirect(['view', 'id' => $model->id]);
         }
 
@@ -135,6 +125,42 @@ class StationsController extends Controller
         $this->findModel($id)->delete();
 
         return $this->redirect(['index']);
+    }
+
+    private function saveStationLogo(Stations $model)
+    {
+        $image = UploadedFile::getInstance($model, 'slogo');
+        if ($image === null) {
+            return true;
+        }
+
+        $extension = strtolower($image->extension);
+        if (!in_array($extension, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) {
+            $model->addError('slogo', 'Please upload a PNG, JPG, GIF, or WebP image.');
+            return false;
+        }
+
+        $uploadDirectory = Yii::getAlias('@webroot/uploads/stations');
+        try {
+            if (!FileHelper::createDirectory($uploadDirectory, 0775, true) || !is_writable($uploadDirectory)) {
+                throw new \RuntimeException('Upload directory is not writable.');
+            }
+        } catch (\Throwable $exception) {
+            Yii::error('Unable to prepare station logo directory: ' . $exception->getMessage(), __METHOD__);
+            $model->addError('slogo', 'The station logo could not be saved. Please contact support.');
+            return false;
+        }
+
+        $filename = Yii::$app->security->generateRandomString() . '.' . $extension;
+        $path = $uploadDirectory . DIRECTORY_SEPARATOR . $filename;
+        if (!$image->saveAs($path)) {
+            Yii::error('Unable to save uploaded station logo to ' . $path, __METHOD__);
+            $model->addError('slogo', 'The station logo could not be saved. Please try again.');
+            return false;
+        }
+
+        $model->slogo = $filename;
+        return true;
     }
 
     /**
