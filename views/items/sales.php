@@ -6,6 +6,7 @@ use yii\helpers\Html;
 use app\components\AppGridView as GridView;
 use kartik\select2\Select2;
 use yii\widgets\ActiveForm;
+use yii\widgets\Pjax;
 use yii\web\JsExpression;
 
 $this->title = 'Sales';
@@ -40,11 +41,21 @@ $this->registerJs("jQuery(function($) {
             </span>
                 <h5>Sales</h5>
             </div>
+            <?php Pjax::begin([
+                'id' => 'sales-cart-pjax',
+                'enablePushState' => false,
+                'timeout' => 15000,
+            ]); ?>
             <div class="widget-content">
                 <center>
                     <?php $form = ActiveForm::begin(
-                        ['method'=>'POST', 'action' => ['sales'],'enableClientValidation' => false,
-                        'enableAjaxValidation' => false]); ?>
+                        [
+                            'method' => 'POST',
+                            'action' => ['sales'],
+                            'enableClientValidation' => false,
+                            'enableAjaxValidation' => false,
+                            'options' => ['data-pjax' => 1],
+                        ]); ?>
                    <table style="width:60%">
                        <tr>
                   
@@ -56,7 +67,7 @@ $this->registerJs("jQuery(function($) {
                 'attribute' => 'name',
                 'options' => [
                     'placeholder' => 'Select Item ...',
-                    'onchange' => 'this.form.submit()',
+                    'onchange' => '$(this.form).trigger("submit")',
                     'class' => 'span12',
                     'style' => 'margin-top:25px; width:100%;',
                 ],
@@ -103,12 +114,14 @@ $this->registerJs("jQuery(function($) {
             'class' => 'kartik\grid\EditableColumn',
             'attribute' => 'price',
             'value' => 'price',
+            'refreshGrid' => true,
 
         ],
         [
             'class' => 'kartik\grid\EditableColumn',
             'attribute' => 'quantity',
             'value' => 'quantity',
+            'refreshGrid' => true,
 
         ],
         [
@@ -119,14 +132,14 @@ $this->registerJs("jQuery(function($) {
                 if($model->quantity > 1) {
                     $rem = Html::a('<span class="glyphicon glyphicon-minus"></span>',
                         ['items/removequantity?id='.$model->id],
-                        ['class' => 'btn btn-danger btn-number btn-mini']);
+                        ['class' => 'btn btn-danger btn-number btn-mini', 'data-pjax' => 1]);
                 }else{
                     $rem = Html::a('<span class="glyphicon glyphicon-minus"></span>',
-                        ['#'], ['class' => 'btn btn-danger btn-number btn-mini']);
+                        ['#'], ['class' => 'btn btn-danger btn-number btn-mini', 'data-pjax' => 0]);
                 }
                 $add = Html::a('<span class="glyphicon glyphicon-plus"></span>',
                 ['items/addquantity?id='.$model->id], 
-                ['class'=>'btn btn-success btn-number btn-mini']);
+                ['class'=>'btn btn-success btn-number btn-mini', 'data-pjax' => 1]);
                 return $rem." ".$add;
             },
         ],
@@ -144,14 +157,15 @@ $this->registerJs("jQuery(function($) {
             'attribute' =>'id',
             'format'=>'html',
             'value' => function($model){
-                return Html::a('<i class="icon icon-remove"></i> <span>Remove</span>', ['items/remove?id='.$model->id], ['class'=>'btn btn-primary btn-mini']);
+                return Html::a('<i class="icon icon-remove"></i> <span>Remove</span>', ['items/remove?id='.$model->id], ['class'=>'btn btn-primary btn-mini', 'data-pjax' => 1]);
             },
 
-            'pageSummary' =>Html::a('<i class="icon icon-remove"></i> <span>Remove All</span>', ['items/removeall'], ['class'=>'btn btn-danger btn-mini']),
+            'pageSummary' =>Html::a('<i class="icon icon-remove"></i> <span>Remove All</span>', ['items/removeall'], ['class'=>'btn btn-danger btn-mini', 'data-pjax' => 1]),
         ],
     ]
 ]); ?>
 </div>
+            <?php Pjax::end(); ?>
         </div>
     </div>
     <div class="span4">
