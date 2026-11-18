@@ -106,7 +106,15 @@ $this->registerJs("jQuery(function($) {
 
 <?= GridView::widget([
     'dataProvider' => $dataProvider,
+    'filterUrl' => Url::to(['/items/sales']),
     'showPageSummary' => true,
+    'panel' => [
+        'after' => Html::a(
+            '<i class="glyphicon glyphicon-repeat"></i>',
+            ['/items/sales'],
+            ['data-pjax' => 0, 'class' => 'btn btn-default', 'title' => 'Refresh']
+        ),
+    ],
     'columns' => [
         ['class' => 'kartik\grid\SerialColumn'],
         'item.name',
@@ -115,6 +123,11 @@ $this->registerJs("jQuery(function($) {
             'attribute' => 'price',
             'value' => 'price',
             'refreshGrid' => true,
+            'editableOptions' => [
+                'pjaxContainerId' => 'sales-cart-pjax',
+                'formOptions' => ['action' => Url::to(['/items/sales'])],
+                'ajaxSettings' => ['url' => Url::to(['/items/sales'])],
+            ],
 
         ],
         [
@@ -122,6 +135,11 @@ $this->registerJs("jQuery(function($) {
             'attribute' => 'quantity',
             'value' => 'quantity',
             'refreshGrid' => true,
+            'editableOptions' => [
+                'pjaxContainerId' => 'sales-cart-pjax',
+                'formOptions' => ['action' => Url::to(['/items/sales'])],
+                'ajaxSettings' => ['url' => Url::to(['/items/sales'])],
+            ],
 
         ],
         [

@@ -371,6 +371,9 @@ class ItemsController extends Controller
         $connection->createCommand()
             ->delete('transactions', 'id =' . $id)
             ->execute();
+        if (Yii::$app->request->isPjax) {
+            return $this->renderSalesPage();
+        }
         return $this->redirect(['sales']);
     }
     public function actionRemoveall()
@@ -379,6 +382,9 @@ class ItemsController extends Controller
 
         $connection->createCommand("DELETE FROM transactions WHERE user_id ='" . Yii::$app->user->id . "' AND status = 'unsold'")
             ->execute();
+        if (Yii::$app->request->isPjax) {
+            return $this->renderSalesPage();
+        }
         return $this->redirect(['sales']);
     }
 
@@ -397,6 +403,9 @@ class ItemsController extends Controller
         }
 
 
+        if (Yii::$app->request->isPjax) {
+            return $this->renderSalesPage();
+        }
         return $this->redirect(['sales', 'show_customer' => '1']);
     }
 
@@ -409,9 +418,10 @@ class ItemsController extends Controller
                 WHERE id=' . $id
         )
             ->execute();
-        return $this->redirect(
-            ['sales', 'show_customer' => '1']
-        );
+        if (Yii::$app->request->isPjax) {
+            return $this->renderSalesPage();
+        }
+        return $this->redirect(['sales', 'show_customer' => '1']);
     }
 
     public function actionSell()
@@ -1003,18 +1013,8 @@ class ItemsController extends Controller
         $userid = (int) Yii::$app->user->id;
         $user = Yii::$app->user->identity;
         $branchId = $user->branch_id;
-        $dataProvider = new ActiveDataProvider([
-            'query' => Transactions::find()
-                ->with(['item'])
-                ->where(['status' => 'unsold', 'user_id' => $userid]),
-            'pagination' => [
-                'pageSize' => 20,
-            ],
-        ]);
-
         $model = new Items();
         $modelt = new Transactions();
-        $customer = new Customers();
 
         if (Yii::$app->request->post('hasEditable')) {
             $out = ['output' => '', 'message' => ''];
@@ -1138,25 +1138,46 @@ class ItemsController extends Controller
                 }
             }
 
+            if (Yii::$app->request->isPjax) {
+                return $this->renderSalesPage();
+            }
             return $this->redirect(['sales', 'show_customer' => '1']);
         } else {
-            $defaultCustomerQuery = Customers::find()->orderBy(['id' => SORT_ASC]);
-            BranchAccess::apply($defaultCustomerQuery, 'branch_id', $branchId);
-            $defaultCustomer = $defaultCustomerQuery->one();
-            $customerOptions = [];
-            if ($defaultCustomer) {
-                $customer->id = $defaultCustomer->id;
-                $customerName = trim($defaultCustomer->company ?: ($defaultCustomer->fname . ' ' . $defaultCustomer->lname));
-                $customerOptions[$defaultCustomer->id] = $customerName ?: 'Customer #' . $defaultCustomer->id;
-            }
-
-            return $this->render('sales', [
-                'model' => $model,
-                'customer' => $customer,
-                'customerOptions' => $customerOptions,
-                'dataProvider' => $dataProvider,
-            ]);
+            return $this->renderSalesPage();
         }
+    }
+
+    private function renderSalesPage()
+    {
+        $user = Yii::$app->user->identity;
+        $userId = (int) $user->id;
+        $branchId = $user->branch_id;
+        $customer = new Customers();
+        $customerOptions = [];
+
+        $defaultCustomerQuery = Customers::find()->orderBy(['id' => SORT_ASC]);
+        BranchAccess::apply($defaultCustomerQuery, 'branch_id', $branchId);
+        $defaultCustomer = $defaultCustomerQuery->one();
+        if ($defaultCustomer) {
+            $customer->id = $defaultCustomer->id;
+            $customerName = trim($defaultCustomer->company ?: ($defaultCustomer->fname . ' ' . $defaultCustomer->lname));
+            $customerOptions[$defaultCustomer->id] = $customerName ?: 'Customer #' . $defaultCustomer->id;
+        }
+
+        $dataProvider = new ActiveDataProvider([
+            'query' => Transactions::find()
+                ->with(['item'])
+                ->where(['status' => 'unsold', 'user_id' => $userId]),
+            'pagination' => ['pageSize' => 20],
+            'sort' => ['route' => '/items/sales'],
+        ]);
+
+        return $this->render('sales', [
+            'model' => new Items(),
+            'customer' => $customer,
+            'customerOptions' => $customerOptions,
+            'dataProvider' => $dataProvider,
+        ]);
     }
 
     public function actionSearchSaleItems($q = '', $page = 1)
