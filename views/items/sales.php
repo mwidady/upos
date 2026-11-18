@@ -1,27 +1,14 @@
 <?php
 
-use app\models\User;
 use yii\helpers\Url;
-use app\models\Items;
 use yii\helpers\Html;
-use app\models\Customers;
 use app\components\AppGridView as GridView;
 use kartik\select2\Select2;
 use yii\widgets\ActiveForm;
-use yii\helpers\ArrayHelper;
+use yii\web\JsExpression;
 
-$branchId = User::findOne(Yii::$app->user->id)->branch_id;
 $this->title = 'Sales';
 
-$img = Url::to('@web/');
-$this->registerJs(
-    '$(document).ready(function(){ 
-$("#customers-id").change(function(){
-var e = document.getElementById("customers-id");
-    var strSel =  e.options[e.selectedIndex].value;
-    window.location.href="'.Yii::$app->urlManager->createUrl('category').'";
-});
-});',"");
 ?>
 
 <div class="container-fluid">
@@ -42,20 +29,27 @@ var e = document.getElementById("customers-id");
                   
                            <td style="padding-top:14px;">
                 <?php
-                $data = ArrayHelper::map(Items::find()->joinWith(['quantitytotal' => function ($query) {
-                    $query->where('quantity_t > 0');
-                },] )->where(['items.branch_id'=>$branchId])->all(),'id', 'name');
-
                 echo $form->field($model, 'name')->widget(Select2::classname(), [
                 'model' => $model,
-                'data' => $data,
+                'data' => [],
                 'attribute' => 'name',
-                'language' => 'es',
-                'options' => ['placeholder' => 'Select Item ...','onchange'=>'this.form.submit()',],
+                'options' => [
+                    'placeholder' => 'Select Item ...',
+                    'onchange' => 'this.form.submit()',
+                    'class' => 'span12',
+                    'style' => 'margin-top:25px; width:100%;',
+                ],
                 'pluginOptions' => [
-
                 'allowClear' => true,
-                'class' => 'span12' ,'style'=>'margin-top:25px; width:100%;'
+                'minimumInputLength' => 1,
+                'ajax' => [
+                    'url' => Url::to(['/items/search-sale-items']),
+                    'dataType' => 'json',
+                    'delay' => 250,
+                    'data' => new JsExpression('function(params) { return {q: params.term, page: params.page || 1}; }'),
+                    'processResults' => new JsExpression('function(data) { return {results: data.results, pagination: {more: data.more}}; }'),
+                ],
+                'width' => '100%',
                 ],
                 ])->label(false);?>
            </td>
@@ -149,16 +143,27 @@ var e = document.getElementById("customers-id");
             ?>
             <div class="widget-content">
 
-                <?php $form = ActiveForm::begin(['action' =>'sell','enableAjaxValidation' => true]); ?>
+                <?php $form = ActiveForm::begin(['action' => ['/items/sell'], 'enableAjaxValidation' => false]); ?>
                 <label>Company Name</label>
                 <?=
-                $form->field($customer, 'id')
-                    ->dropDownList(
-                        ArrayHelper::map(Customers::find()->where(['branch_id'=>$branchId])->all(), 
-                        'id', 'company'), ['onchange'=>'$.get( "'.Yii::$app->urlManager->createUrl(["items/cdetails?id="]).'"+$(this).val(),function(data){
-                    $("#cdetails").html( data );
-                    })']
-                    )->label(false)
+                $form->field($customer, 'id')->widget(Select2::classname(), [
+                    'data' => [],
+                    'options' => [
+                        'placeholder' => 'Search customer or company ...',
+                        'onchange' => '$.get("' . Url::to(['/items/cdetails']) . '", {id: this.value}, function(data) { $("#cdetails").html(data); });',
+                    ],
+                    'pluginOptions' => [
+                        'allowClear' => true,
+                        'minimumInputLength' => 1,
+                        'ajax' => [
+                            'url' => Url::to(['/items/search-sale-customers']),
+                            'dataType' => 'json',
+                            'delay' => 250,
+                            'data' => new JsExpression('function(params) { return {q: params.term, page: params.page || 1}; }'),
+                            'processResults' => new JsExpression('function(data) { return {results: data.results, pagination: {more: data.more}}; }'),
+                        ],
+                    ],
+                ])->label(false)
                 ?>
          
                 <hr>

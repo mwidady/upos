@@ -417,110 +417,112 @@ class ItemsController extends Controller
 
     public function actionSell()
     {
-        $modelc = new Customers();
-        if ($modelc->load(Yii::$app->request->post())) {
-            $customer_id = $_POST['Customers']['id'];
+        $user = Yii::$app->user->identity;
+        $userId = (int) $user->id;
+        $branchId = $user->branch_id;
+        $customerPost = Yii::$app->request->post('Customers', []);
+        $customerId = isset($customerPost['id']) ? (int) $customerPost['id'] : 0;
+        $db = Yii::$app->db;
+
+        $customerQuery = Customers::find()->where(['id' => $customerId]);
+        BranchAccess::apply($customerQuery, 'branch_id', $branchId);
+        $customer = $customerQuery->one();
+        if (!$customer) {
+            Yii::$app->session->setFlash('error', 'Select a valid customer for this branch before selling.');
+            return $this->redirect(['sales', 'show_customer' => 1]);
         }
 
-        $ts_time = new \yii\db\Expression('NOW()');
-
-        $connection = \Yii::$app->db;
-
-        $modelcheck = $connection->createCommand(
-            "SELECT * 
-                FROM transactions 
-                WHERE status ='unsold' 
-                AND user_id=" . Yii::$app->user->id
-        );
-        $check_items = $modelcheck->queryAll();
-
-        foreach ($check_items as $ckeck) {
-            $connection->createCommand(
-                'UPDATE transactions SET 
-                    status = "invoice",
-                    ts_time = ' . $ts_time . ',
-                    customer_id =' . $customer_id . ' 
-                    WHERE 
-                    status= "unsold" 
-                    AND item_id = ' . $ckeck['item_id'] . ' 
-                    AND user_id=' . Yii::$app->user->id
-            )
-                ->execute();
-
-            $connection->createCommand(
-                "UPDATE quantity_total 
-                    SET quantity_t = quantity_t - '" . $ckeck['quantity'] . "' 
-                    WHERE  item_id = '" . $ckeck['item_id'] . "'"
-            )
-                ->execute();
-        }
-
-
-        //create invoice number
-
-        //Get station ID
-        $stationId = User::findOne(Yii::$app->user->id)
-            ->branch
-            ->station_id;
-
-        //Get branch ID
-        $branchId = User::findOne(Yii::$app->user->id)
-            ->branch_id;
-
-
-         $payPartial = Workflow::find()
-         ->where(['branch_id' => $branchId,'workflow_code' => WorkflowConstant::PARTIAL_PAYMENT])
-         ->count();   
-
-        //get 2 batches min max
-        $batch = Batches::find()
-            ->where(['station_id' => $stationId])
-            ->orderBy(['created_at' => SORT_DESC])->one();
-
-        //check last invoice batch  number
-        $invoice = Invoices::find()
-            ->where(['branch_id' => $branchId])
-            ->orderBy(['created_at' => SORT_DESC])->one();
-        //get transaction amount total
-
-        $query = (new \yii\db\Query())
+        $cartSummary = (new \yii\db\Query())
+            ->select([
+                'line_count' => 'COUNT(*)',
+                'item_count' => 'COUNT(DISTINCT item_id)',
+                'cart_total' => 'COALESCE(SUM(price * quantity), 0)',
+            ])
             ->from('transactions')
-            ->where(['ts_time' => $ts_time]);
-
-        $sumtotal = $query->sum('price * quantity');
-
-        //save invoice
-        $inv = new Invoices();
-        $inv->amount = $sumtotal;
-        $inv->generated_by = Yii::$app->user->id;
-        $inv->status = "NOT PAID";
-        $inv->created_at = $ts_time;
-        $inv->branch_id = $branchId;
-        $inv->customer_id = $customer_id;
-
-        if ($invoice == null) {
-            $inv->invoiceno = $batch->start_at;
-            $inv->save(false);
-
-            \Yii::$app->db->createCommand(
-                "UPDATE transactions SET 
-                    invoice_id = $inv->id
-                    WHERE ts_time = $ts_time"
-            )
-                ->execute();
-        } else {
-            $inv->invoiceno = $invoice->invoiceno + 1;
-            $inv->save(false);
-
-            \Yii::$app->db->createCommand(
-                "UPDATE transactions SET 
-                    invoice_id = $inv->id
-                    WHERE ts_time = $ts_time"
-            )
-                ->execute();
+            ->where(['status' => 'unsold', 'user_id' => $userId])
+            ->one($db);
+        $cartCount = (int) $cartSummary['line_count'];
+        $cartItemCount = (int) $cartSummary['item_count'];
+        $sumTotal = (float) $cartSummary['cart_total'];
+        if ($cartCount === 0) {
+            Yii::$app->session->setFlash('error', 'Add at least one item before completing the sale.');
+            return $this->redirect(['sales']);
         }
 
-        $branchId = User::findOne(Yii::$app->user->id)->branch_id;
+        $stationId = $user->branch ? $user->branch->station_id : null;
+        $batch = null;
+        $invoiceQuery = Invoices::find()->where(['branch_id' => $branchId]);
+        $lastInvoice = $invoiceQuery->orderBy(['created_at' => SORT_DESC, 'id' => SORT_DESC])->one();
+        if (!$lastInvoice) {
+            if (!$stationId) {
+                Yii::$app->session->setFlash('error', 'This user is not assigned to a station. Ask an administrator to configure the branch.');
+                return $this->redirect(['sales', 'show_customer' => 1]);
+            }
+            $batch = Batches::find()
+                ->where(['station_id' => $stationId])
+                ->orderBy(['created_at' => SORT_DESC, 'id' => SORT_DESC])
+                ->one();
+            if (!$batch) {
+                Yii::$app->session->setFlash('error', 'No invoice number batch is configured for this station. Create a batch before selling.');
+                return $this->redirect(['sales', 'show_customer' => 1]);
+            }
+        }
+
+        $workflowQuery = Workflow::find()
+            ->where(['branch_id' => $branchId, 'workflow_code' => WorkflowConstant::PARTIAL_PAYMENT]);
+        BranchAccess::apply($workflowQuery, 'branch_id', $branchId);
+        $payPartial = $workflowQuery->count();
+        $transaction = $db->beginTransaction();
+        try {
+            $now = $db->createCommand('SELECT NOW()')->queryScalar();
+            $inv = new Invoices();
+            $inv->amount = $sumTotal;
+            $inv->generated_by = $userId;
+            $inv->status = 'NOT PAID';
+            $inv->created_at = $now;
+            $inv->branch_id = $branchId;
+            $inv->customer_id = $customerId;
+            $inv->invoiceno = $lastInvoice ? $lastInvoice->invoiceno + 1 : $batch->start_at;
+            if (!$inv->save(false)) {
+                throw new \RuntimeException('Invoice could not be saved.');
+            }
+
+            $updatedLines = $db->createCommand()->update('transactions', [
+                'status' => 'invoice',
+                'ts_time' => $now,
+                'customer_id' => $customerId,
+                'invoice_id' => $inv->id,
+            ], ['status' => 'unsold', 'user_id' => $userId])->execute();
+            if ($updatedLines !== $cartCount) {
+                throw new \RuntimeException('The cart changed while the sale was being completed. Please retry.');
+            }
+
+            $stockRowsUpdated = $db->createCommand(
+                'UPDATE quantity_total qt
+                 INNER JOIN (
+                     SELECT item_id, SUM(quantity) AS sold_quantity
+                     FROM transactions
+                     WHERE invoice_id = :invoiceId
+                     GROUP BY item_id
+                 ) sold ON sold.item_id = qt.item_id
+                 SET qt.quantity_t = qt.quantity_t - sold.sold_quantity
+                 WHERE qt.quantity_t >= sold.sold_quantity',
+                [':invoiceId' => $inv->id]
+            )->execute();
+            if ($stockRowsUpdated < $cartItemCount) {
+                throw new \RuntimeException('There is not enough stock to complete this sale. Check the cart quantities and try again.');
+            }
+            $transaction->commit();
+        } catch (\Throwable $e) {
+            if ($transaction->isActive) {
+                $transaction->rollBack();
+            }
+            Yii::error($e, __METHOD__);
+            Yii::$app->session->setFlash('error', $e instanceof \RuntimeException
+                ? $e->getMessage()
+                : 'The sale could not be completed. Please try again or contact an administrator.');
+            return $this->redirect(['sales', 'show_customer' => 1]);
+        }
 
         $receiptDetailsQuery = (new \yii\db\Query())
             ->select([
@@ -535,12 +537,12 @@ class ItemsController extends Controller
             ->where([
                 'T.status' => 'invoice',
                 'T.invoice_id' => $inv->id,
-                'I.branch_id' => $branchId
             ])
-            ->orderBy('T.id DESC')
-            ->one();
+            ->orderBy('T.id DESC');
+        BranchAccess::apply($receiptDetailsQuery, 'I.branch_id', $branchId);
+        $receipt_details = $receiptDetailsQuery->one();
 
-        $receipt_items = (new \yii\db\Query())
+        $receiptItemsQuery = (new \yii\db\Query())
             ->select([
                 'T.id', 'I.name', 'T.price',
                 'T.quantity', 'I.supplier', 'I.vat',
@@ -552,13 +554,12 @@ class ItemsController extends Controller
                 [
                     'T.invoice_id' => $inv->id,
                     'T.status' => 'invoice',
-                    'I.branch_id' => $branchId
                 ]
-            )
-            ->all();
+            );
+        BranchAccess::apply($receiptItemsQuery, 'I.branch_id', $branchId);
+        $receipt_items = $receiptItemsQuery->all();
 
-
-        $station = User::findOne(Yii::$app->user->id)->branch;
+        $station = $user->branch;
 
         return $this->render('//invoices/invoice', [
             'receipt_items' => $receipt_items,
@@ -959,7 +960,14 @@ class ItemsController extends Controller
 
     public function actionCdetails($id)
     {
-        $customer_d = Customers::find()->where(['id' => $id])->one();
+        $user = Yii::$app->user->identity;
+        $customerQuery = Customers::find()->where(['id' => $id]);
+        BranchAccess::apply($customerQuery, 'branch_id', $user->branch_id);
+        $customer_d = $customerQuery->one();
+        if (!$customer_d) {
+            Yii::$app->response->statusCode = 404;
+            return 'Customer not found.';
+        }
 ?>
         <table class="table table-bordered table-striped">
 
@@ -993,44 +1001,21 @@ class ItemsController extends Controller
     }
     public function actionSales()
     {
-        $userid =  Yii::$app->user->id;
-        $connection = \Yii::$app->db;
-        $sql =  "SELECT T.id, I.name,I.sprice,T.quantity,I.supplier,I.vat 
-        FROM items I,transactions T 
-        WHERE I.id = T.item_id 
-        AND T.status ='unsold' 
-        AND T.user_id = '" . $userid . "' ";
-        $count =  "SELECT COUNT(T.id) AS id, 
-        I.name,I.sprice,T.quantity,I.supplier,I.vat 
-        FROM items I,transactions T 
-        WHERE I.id = T.item_id 
-        AND T.status ='unsold' 
-        AND T.user_id = '" . $userid . "' ";
-
-        $dataProvider = new SqlDataProvider([
-            'sql' => $sql,
-            'key' => 'id',
-            'totalCount' => $count,
-        ]);
-
+        $userid = (int) Yii::$app->user->id;
+        $user = Yii::$app->user->identity;
+        $branchId = $user->branch_id;
         $dataProvider = new ActiveDataProvider([
             'query' => Transactions::find()
-            ->where(['status' => 'unsold', 'user_id' => $userid]),
+                ->with(['item'])
+                ->where(['status' => 'unsold', 'user_id' => $userid]),
             'pagination' => [
                 'pageSize' => 20,
             ],
         ]);
-        $provider_items = $dataProvider->getModels();
 
         $model = new Items();
         $modelt = new Transactions();
         $customer = new Customers();
-        
-        $branchId = User::findOne(Yii::$app->user->id)->branch_id;
-        
-        $payPartial = Workflow::find()
-         ->where(['branch_id' => $branchId,'workflow_code' => WorkflowConstant::PARTIAL_PAYMENT])
-         ->count();  
 
         if (Yii::$app->request->post('hasEditable')) {
             $out = Json::encode(['output' => "Success", 'message' => 'Ok']);
@@ -1103,44 +1088,96 @@ class ItemsController extends Controller
         if ($model->load(Yii::$app->request->post())) {
 
 
-            $check_exist_item = Items::find()->where(['id' => $model->name])->count();
-            $check_exist_item_curent_sales = Transactions::find()
-                ->where(['item_id' => $model->name, 'user_id' => Yii::$app->user->id, 'status' => 'unsold'])->count();
+            $itemQuery = Items::find()->where(['id' => $model->name]);
+            BranchAccess::apply($itemQuery, 'branch_id', $branchId);
+            $selectedItem = $itemQuery->one();
+            $alreadyInCart = Transactions::find()
+                ->where(['item_id' => $model->name, 'user_id' => $userid, 'status' => 'unsold'])
+                ->exists();
 
-            if ($check_exist_item_curent_sales > 0) {
-                // //\Yii::$app->getSession()->setFlash('error','No product with such number found');
-
-            } else if ($check_exist_item < 1) {
-                \Yii::$app->getSession()->setFlash('error', 'No product with such number found');
-                // print("no product found");
+            if (!$selectedItem) {
+                Yii::$app->session->setFlash('error', 'No product with that number is available in this branch.');
+            } elseif ($alreadyInCart) {
+                Yii::$app->session->setFlash('error', 'This product is already in the cart. Change its quantity in the cart instead.');
             } else {
-                $check_sold_price = Items::find()
-                ->where(['id' => $model->name])
-                ->one();
-                $modelt->user_id = Yii::$app->user->id;
-                $modelt->trans_date = new \yii\db\Expression('NOW()');
-                $modelt->price = $check_sold_price->sprice;
-                $modelt->customer_id = 1;
-                $modelt->item_id = $model->name;
-                $modelt->payment_type = 1;
-                $modelt->quantity = 1;
-                $modelt->status = "unsold";
-                $modelt->ts_time = new \yii\db\Expression('NOW()');
-                $modelt->transaction_no = rand(100, 10000);
-                $modelt->save(false);
+                $cartCustomerQuery = Customers::find()
+                    ->select('id')
+                    ->orderBy(['id' => SORT_ASC]);
+                BranchAccess::apply($cartCustomerQuery, 'branch_id', $branchId);
+                $cartCustomerId = $cartCustomerQuery->scalar();
+                if (!$cartCustomerId) {
+                    Yii::$app->session->setFlash('error', 'Create a customer for this branch before adding products to a sale.');
+                } else {
+                    $modelt->user_id = $userid;
+                    $modelt->trans_date = new \yii\db\Expression('NOW()');
+                    $modelt->price = $selectedItem->sprice;
+                    $modelt->customer_id = $cartCustomerId;
+                    $modelt->item_id = $model->name;
+                    $modelt->payment_type = 1;
+                    $modelt->quantity = 1;
+                    $modelt->status = "unsold";
+                    $modelt->ts_time = new \yii\db\Expression('NOW()');
+                    $modelt->transaction_no = rand(100, 10000);
+                    $modelt->save(false);
+                }
             }
 
-            return $this->redirect(['sales', 'provider_items' => $provider_items, 'dataProvider' => $dataProvider, 'show_customer' => '1',]);
+            return $this->redirect(['sales', 'show_customer' => '1']);
         } else {
-
             return $this->render('sales', [
                 'model' => $model,
                 'customer' => $customer,
-                'dataProvider' => $dataProvider, 
-                'provider_items' => $provider_items,
-                'payPartial' => $payPartial
+                'dataProvider' => $dataProvider,
             ]);
         }
+    }
+
+    public function actionSearchSaleItems($q = '', $page = 1)
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        $q = trim($q);
+        if ($q === '') {
+            return ['results' => [], 'more' => false];
+        }
+
+        $user = Yii::$app->user->identity;
+        $query = (new \yii\db\Query())
+            ->select(['id' => 'i.id', 'text' => 'i.name'])
+            ->from(['i' => 'items'])
+            ->innerJoin(['qt' => 'quantity_total'], 'qt.item_id = i.id')
+            ->where(['>', 'qt.quantity_t', 0])
+            ->andWhere('i.name LIKE :query', [':query' => $q . '%'])
+            ->orderBy(['i.name' => SORT_ASC]);
+        BranchAccess::apply($query, 'i.branch_id', $user->branch_id);
+        $page = max(1, min((int) $page, 1000));
+        $rows = $query->offset(($page - 1) * 20)->limit(21)->all();
+        $more = count($rows) > 20;
+        return ['results' => array_slice($rows, 0, 20), 'more' => $more];
+    }
+
+    public function actionSearchSaleCustomers($q = '', $page = 1)
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        $q = trim($q);
+        if ($q === '') {
+            return ['results' => [], 'more' => false];
+        }
+
+        $user = Yii::$app->user->identity;
+        $query = Customers::find()
+            ->select(['id', 'company', 'fname', 'lname'])
+            ->andWhere('(company LIKE :query OR fname LIKE :query OR lname LIKE :query)', [':query' => $q . '%'])
+            ->orderBy(['company' => SORT_ASC, 'fname' => SORT_ASC]);
+        BranchAccess::apply($query, 'branch_id', $user->branch_id);
+        $page = max(1, min((int) $page, 1000));
+        $rows = $query->offset(($page - 1) * 20)->limit(21)->asArray()->all();
+        $more = count($rows) > 20;
+        $results = [];
+        foreach (array_slice($rows, 0, 20) as $row) {
+            $name = trim($row['company'] ?: ($row['fname'] . ' ' . $row['lname']));
+            $results[] = ['id' => $row['id'], 'text' => $name];
+        }
+        return ['results' => $results, 'more' => $more];
     }
     public function actionTransactions()
     {

@@ -89,6 +89,12 @@ use kartik\sidenav\SideNav;
                 'active' => ($curentpage == 'payment-transactions/index')
             ],
             [
+                'label' => 'Transactions',
+                'icon' => 'list',
+                'url' => Url::toRoute('/transactions/index'),
+                'active' => ($curentpage == 'transactions/index')
+            ],
+            [
                 'url' => Url::toRoute('/items/index'),
                 'label' => 'Items',
                 'icon' => 'list',
@@ -124,24 +130,6 @@ use kartik\sidenav\SideNav;
                 ]),
                 'items' => [
                     [
-                        'label' => 'Transactions',
-                        'icon' => 'list',
-                        'url' => Url::toRoute('/transactions/index'),
-                        'active' => ($curentpage == 'transactions/index')
-                    ],
-                    [
-                        'label' => 'Invoices',
-                        'icon' => 'record',
-                        'url' => Url::toRoute('/invoices/index'),
-                        'active' => ($curentpage == 'invoices/index')
-                    ],
-                    [
-                        'label' => 'Debit',
-                        'icon' => 'warning-sign',
-                        'url' => Url::toRoute(['/invoices/index', 'InvoicesSearch[status]' => 'NOT PAID']),
-                        'active' => ($curentpage == 'invoices/index' && (Yii::$app->request->get('InvoicesSearch')['status'] ?? '') == 'NOT PAID')
-                    ],
-                    [
                         'label' => 'Sales Profits',
                         'icon' => 'file',
                         'url' => Url::toRoute('/transactions/profits'),
@@ -163,6 +151,12 @@ use kartik\sidenav\SideNav;
                 'icon' => 'th',
                 'visible' => Yii::$app->user->can('Manage Customer'),
                 'active' => ($curentpage == 'customers/index')
+            ],
+            [
+                'label' => 'Debit',
+                'icon' => 'warning-sign',
+                'url' => Url::toRoute(['/invoices/index', 'InvoicesSearch[status]' => 'NOT PAID']),
+                'active' => ($curentpage == 'invoices/index' && (Yii::$app->request->get('InvoicesSearch')['status'] ?? '') == 'NOT PAID')
             ],
             [
                 'label' => 'Settings <span class="pull-right badge btn-danger">7</span>',
