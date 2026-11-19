@@ -73,7 +73,7 @@ $this->registerJs("jQuery(function($) {
                 ],
                 'pluginOptions' => [
                 'allowClear' => true,
-                'minimumInputLength' => 1,
+                'minimumInputLength' => 0,
                 'ajax' => [
                     'url' => Url::to(['/items/search-sale-items']),
                     'dataType' => 'json',

@@ -137,7 +137,7 @@ use kartik\sidenav\SideNav;
                         'active' => ($curentpage == 'quantity/index'),
                     ],
                     [
-                        'label' => 'Sales Profits',
+                        'label' => 'Sales Records',
                         'icon' => 'file',
                         'url' => Url::toRoute('/transactions/profits'),
                         'visible' => Yii::$app->user->can('Manage Transaction'),

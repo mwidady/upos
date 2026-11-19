@@ -1184,9 +1184,6 @@ class ItemsController extends Controller
     {
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         $q = trim($q);
-        if ($q === '') {
-            return ['results' => [], 'more' => false];
-        }
 
         $user = Yii::$app->user->identity;
         $query = (new \yii\db\Query())
@@ -1194,13 +1191,16 @@ class ItemsController extends Controller
             ->from(['i' => 'items'])
             ->innerJoin(['qt' => 'quantity_total'], 'qt.item_id = i.id')
             ->where(['>', 'qt.quantity_t', 0])
-            ->andWhere('i.name LIKE :query', [':query' => $q . '%'])
             ->orderBy(['i.name' => SORT_ASC]);
+        if ($q !== '') {
+            $query->andWhere('i.name LIKE :query', [':query' => $q . '%']);
+        }
         BranchAccess::apply($query, 'i.branch_id', $user->branch_id);
         $page = max(1, min((int) $page, 1000));
-        $rows = $query->offset(($page - 1) * 20)->limit(21)->all();
-        $more = count($rows) > 20;
-        return ['results' => array_slice($rows, 0, 20), 'more' => $more];
+        $pageSize = $q === '' ? 5 : 20;
+        $rows = $query->offset(($page - 1) * $pageSize)->limit($pageSize + 1)->all();
+        $more = count($rows) > $pageSize;
+        return ['results' => array_slice($rows, 0, $pageSize), 'more' => $more];
     }
 
     public function actionSearchSaleCustomers($q = '', $page = 1)
