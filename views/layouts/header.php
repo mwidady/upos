@@ -12,7 +12,7 @@ use kartik\sidenav\SideNav;
 <div id="header">
     <h2 class="lyiora-brand-heading">
         <?= Html::a(
-            Html::img(Url::to('@web/images/lyiora-mark.webp'), [
+            Html::img(Url::to('@web/images/lyiora-lighting.webp'), [
                 'class' => 'lyiora-brand-mark',
                 'alt' => '',
                 'aria-hidden' => 'true',

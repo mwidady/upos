@@ -84,7 +84,7 @@ body.login-layout {
     z-index: 1;
     display: block;
     width: min(100%, 270px);
-    aspect-ratio: 900 / 930;
+    aspect-ratio: 512 / 453;
     align-self: center;
     object-fit: contain;
     border-radius: 8px;

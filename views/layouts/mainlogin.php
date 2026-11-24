@@ -19,7 +19,7 @@ AppAssetLogin::register($this);
     <meta charset="<?= Yii::$app->charset ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <?= Html::csrfMetaTags() ?>
-    <link rel="icon" type="image/x-icon" href="<?= Html::encode(Url::to('@web/lyiora-favicon.ico')) ?>">
+    <link rel="icon" type="image/x-icon" href="<?= Html::encode(Url::to('@web/lyiora-favicon.ico') . '?v=20261121') ?>">
     <title><?= Html::encode($this->title) ?></title>
     <?php $this->head() ?>
 </head>
