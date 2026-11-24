@@ -7,10 +7,6 @@
 /node_modules/
 /bower_components/
 
-# Environment and sensitive configuration
-.env
-.env.*
-!.env.example
 
 /config/db.php
 /config/db-local.php
@@ -28,10 +24,6 @@
 
 # User uploaded files
 /web/uploads/
-/frontend/web/uploads/
-/backend/web/uploads/
-/api/web/uploads/
-/web/files/
 
 # Local development files
 .DS_Store
